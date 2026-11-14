@@ -40,6 +40,27 @@ draft: false
 - `posts/_模板.md` 是一份可以直接抄的结构，别删（它是 draft 状态，不会输出）
 - 支持代码块、表格、引用、图片、列表（Markdown 标准语法 + fenced code）
 
+## 三个可选字段
+
+除了 `title` / `date` / `summary` / `tags`，还支持：
+
+```markdown
+series: 缓存与并发        # 系列名，会显示成徽章，并自动汇总到「系列」页
+updated: 2026-11-20      # 最后更新日期，和 date 不同时才显示
+draft: false             # true 则不生成
+```
+
+## 定时发布
+
+`date` 写**未来的日期**，文章在构建时会被跳过，日期到了才出现。
+
+```bash
+python3 build.py        # 正常构建，未到期的文章不会生成
+python3 build.py --all  # 本地预览，把所有未到期的文章也生成出来
+```
+
+配合 `.github/workflows/build.yml`，GitHub 每天北京时间 09:00 自动构建一次，到期的文章自己就上线了，不用管。
+
 ## 发布到 GitHub Pages
 
 1. 在 GitHub 建一个**空仓库**，名字用 `<用户名>.github.io`（这样访问地址就是 `https://<用户名>.github.io`，没有子路径）。**README、.gitignore、License 三个勾都不要勾**，否则会和本地历史冲突

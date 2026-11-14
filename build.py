@@ -37,6 +37,8 @@ SITE = {
     "school": "Java 后端 · 2027 届",
 }
 
+SHOW_FUTURE = "--all" in sys.argv   # 本地预览未到期的定时文章
+
 MD = markdown.Markdown(extensions=["fenced_code", "tables", "sane_lists", "attr_list"])
 
 
@@ -115,6 +117,7 @@ def page(title, body, prefix="", extra_head=""):
     <nav class="nav">
       <a href="{prefix}index.html">文章</a>
       <a href="{prefix}tags/index.html">标签</a>
+      <a href="{prefix}series/index.html">系列</a>
       <a href="{prefix}about/index.html">关于</a>
       <a href="{prefix}feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -146,10 +149,14 @@ def load_posts():
     posts = []
     if not POSTS_DIR.exists():
         return posts
+    today = "9999-12-31" if SHOW_FUTURE else datetime.date.today().isoformat()
     for f in sorted(POSTS_DIR.glob("*.md")):
         text = f.read_text(encoding="utf-8")
         meta, body = parse_front_matter(text)
         if meta.get("draft", "").lower() in ("true", "yes", "1"):
+            continue
+        date = meta.get("date", "2026-01-01")
+        if date > today:          # 定时发布：日期未到的文章暂不生成
             continue
         MD.reset()
         content = MD.convert(body)
@@ -157,7 +164,9 @@ def load_posts():
         posts.append({
             "slug": f.stem,
             "title": meta.get("title", f.stem),
-            "date": meta.get("date", "2026-01-01"),
+            "date": date,
+            "updated": meta.get("updated", ""),
+            "series": meta.get("series", ""),
             "summary": meta.get("summary", ""),
             "tags": tags,
             "content": content,
@@ -214,12 +223,24 @@ def build_post(p, posts):
     tags_html = "".join(
         f'<a class="tag" href="../../tags/index.html#{slugify_tag(t)}">{esc(t)}</a>' for t in p["tags"]
     )
+    series_html = ""
+    if p["series"]:
+        same = [x for x in posts if x["series"] == p["series"]]
+        series_html = (
+            f'<a class="tag tag-series" href="../../series/index.html#{slugify_tag(p["series"])}">'
+            f'系列 · {esc(p["series"])}（{len(same)} 篇）</a>'
+        )
+    updated_html = ""
+    if p["updated"] and p["updated"] != p["date"]:
+        updated_html = f"<span>最后更新 {fmt_date(p['updated'])}</span>"
     body = f"""  <article class="article">
     <header class="article-head">
       <h1>{esc(p['title'])}</h1>
       <div class="meta-line">
         <span>{fmt_date(p['date'])}</span>
+        {updated_html}
         <span>约 {p['minutes']} 分钟</span>
+        {series_html}
         <span class="tags">{tags_html}</span>
       </div>
     </header>
@@ -254,6 +275,29 @@ def build_tags(posts):
     </section>""")
     body = '  <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">标签</h1></section>\n' + "\n".join(blocks)
     return page("标签", body, prefix="../../")
+
+
+def build_series(posts):
+    groups = {}
+    for p in posts:
+        if p["series"]:
+            groups.setdefault(p["series"], []).append(p)
+    if not groups:
+        return page("系列", '  <p class="empty">还没有系列。</p>', prefix="../../")
+    blocks = []
+    for s in sorted(groups, key=lambda x: (-len(groups[x]), x)):
+        items = sorted(groups[s], key=lambda x: x["date"])
+        lis = "".join(
+            f'<li><a href="../../{post_url(p)}">{esc(p["title"])}</a> '
+            f'<span style="color:var(--faint);font-size:13px">{fmt_date(p["date"])}</span></li>'
+            for p in items
+        )
+        blocks.append(f"""    <section id="{slugify_tag(s)}" style="margin-bottom:36px">
+      <p class="section-label">{esc(s)} · {len(items)} 篇</p>
+      <ul class="prose" style="font-size:15px">{lis}</ul>
+    </section>""")
+    body = '  <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">系列</h1></section>\n' + "\n".join(blocks)
+    return page("系列", body, prefix="../../")
 
 
 def build_page(md_file):
@@ -334,6 +378,9 @@ def main():
 
     (OUT / "tags").mkdir(exist_ok=True)
     (OUT / "tags" / "index.html").write_text(build_tags(posts), encoding="utf-8")
+
+    (OUT / "series").mkdir(exist_ok=True)
+    (OUT / "series" / "index.html").write_text(build_series(posts), encoding="utf-8")
 
     if PAGES_DIR.exists():
         for f in PAGES_DIR.glob("*.md"):
