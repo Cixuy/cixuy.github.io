@@ -5,7 +5,7 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 14 Nov 2026 17:12:29 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 14 Nov 2026 17:24:22 +0800</lastBuildDate>
     <item>
       <title>WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</title>
       <link>https://cixuy.github.io/posts/websocket-behind-nginx/index.html</link>

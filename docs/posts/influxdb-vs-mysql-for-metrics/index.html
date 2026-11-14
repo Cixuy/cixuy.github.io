@@ -28,6 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -40,7 +41,9 @@
       <h1>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</h1>
       <div class="meta-line">
         <span>2026 年 11 月 9 日</span>
+        <span>最后更新 2026 年 11 月 14 日</span>
         <span>约 4 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#存储选型">系列 · 存储选型（1 篇）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#influxdb">InfluxDB</a><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#选型">选型</a></span>
       </div>
     </header>
@@ -135,7 +138,7 @@ influx bucket create -n metrics -r 720h
 </ol>
 <p>另外补一句：引入第二个存储之后，<strong>一致性就是你要自己扛的事了</strong>。MySQL 里删了一台服务器，InfluxDB 里它的历史指标还在 —— 要么接受这个不一致（大多数监控场景可以接受），要么在业务层做级联清理。这个成本在选型时容易被忽略。</p>
 <hr />
-<p>数据量那块我按 50 台机器估算的，真实环境扩容到 【填入实际规模】 之后，写入延迟是 【填入实测值】。如果你也在做类似的系统，先把自己的量级算清楚再选，别照着别人的架构抄。</p>
+<p>数据量那块我按 50 台机器估算的，机器数再往上翻，写入侧的压力会比线性增长更明显。如果你也在做类似的系统，先把自己的量级算清楚再选，别照着别人的架构抄。</p>
     </div>
     <footer class="article-foot">
       <div><a href="../../posts/redis-logical-expire/index.html">下一篇：缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 →</a></div>

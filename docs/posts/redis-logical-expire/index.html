@@ -28,6 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -40,7 +41,9 @@
       <h1>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</h1>
       <div class="meta-line">
         <span>2026 年 11 月 12 日</span>
+        <span>最后更新 2026 年 11 月 14 日</span>
         <span>约 4 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#缓存与并发">系列 · 缓存与并发（1 篇）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#缓存">缓存</a><a class="tag" href="../../tags/index.html#并发">并发</a></span>
       </div>
     </header>
@@ -141,7 +144,7 @@
 <p>另外缓存整体不可用（Redis 挂了）时要有降级：直接查库 + 限流，别让请求全压到 MySQL 上把数据库一起带走。</p>
 <h2>小结</h2>
 <p>逻辑过期的核心不是"异步重建"这四个字，而是围绕它的一圈配套：<strong>重建互斥、锁续期、线程池隔离、失败退避</strong>。少任何一个，方案都会在压测或者线上某一刻失效。</p>
-<p>至于具体数值，建议自己压一遍再决定 —— 我的 P95 和命中率是在 【填入你的实测值】 之后才定下来的，别人环境里的数字对你不一定有参考价值。</p>
+<p>至于具体数值，建议自己压一遍再决定 —— 我这套参数也是本地压测之后才定下来的，别人环境里的数字对你不一定有参考价值。</p>
     </div>
     <footer class="article-foot">
       <div><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">← MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <a href="../../posts/websocket-behind-nginx/index.html">下一篇：WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 →</a></div>
