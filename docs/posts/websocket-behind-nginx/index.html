@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</h1>
+      <div class="meta-line">
+        <span>2026 年 11 月 14 日</span>
+        <span>约 3 分钟</span>
+        <span class="tags"><a class="tag" href="../../tags/index.html#websocket">WebSocket</a><a class="tag" href="../../tags/index.html#nginx">Nginx</a><a class="tag" href="../../tags/index.html#部署">部署</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>智慧工地那个项目里，大屏需要实时显示塔吊的运行参数和告警截图，我把 HTTP 轮询换成了 WebSocket。本地开发一切正常，部署到测试服务器（前面挂 Nginx 做反向代理）之后，连接表现得很奇怪：有时候握手直接 400，有时候连上了但一分钟左右就断，前端只能靠重连硬扛。</p>
+<p>后来把这三个坑一个个挖出来，记录一下。</p>
+<h2>坑一：<code>Upgrade</code> 头没有透传，握手直接 400</h2>
+<p>WebSocket 的握手本质上是一个带 <code>Upgrade: websocket</code> 头的 HTTP 请求。Nginx 默认按普通 HTTP 请求处理，不会把这个头往后传，后端拿到的就是一个普通 GET，握手自然失败。</p>
+<p>第一版配置我写成了这样：</p>
+<pre><code class="language-nginx">location /ws {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection &quot;upgrade&quot;;
+}
+</code></pre>
+<p>能连上，但站点上其他普通 HTTP 接口全变成了长连接语义，<code>keep-alive</code> 行为被破坏。正确写法是用 <code>map</code> 判断来源请求到底是不是升级请求：</p>
+<pre><code class="language-nginx">map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    location /ws {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host       $host;
+    }
+}
+</code></pre>
+<p>两个容易漏的点：<strong><code>proxy_http_version</code> 必须是 1.1</strong>（默认是 1.0，不支持升级）；<code>Connection</code> 不能硬编码成 <code>upgrade</code>。</p>
+<h2>坑二：<code>proxy_read_timeout</code> 默认 60 秒</h2>
+<p>这个坑最隐蔽 —— 连接建立成功了，握手也返回了 <code>101 Switching Protocols</code>，但<strong>一分钟左右稳定断开</strong>。</p>
+<p>原因是 Nginx 的 <code>proxy_read_timeout</code> 默认 60s：如果后端在这个时间内没有向代理发过任何数据，Nginx 就认为连接空闲并关掉它。塔吊参数不是每秒都在变，业务上确实可能几十秒没有消息，于是连接就被判定为空闲。</p>
+<p>两层都要处理：</p>
+<pre><code class="language-nginx">location /ws {
+    proxy_read_timeout  300s;
+    proxy_send_timeout  300s;
+}
+</code></pre>
+<p>同时在应用层加心跳，比如前端每 25 秒发一次 ping，后端回 pong。<strong>只加心跳不改 timeout 是不够的</strong>，因为心跳间隔一旦大于 timeout，连接照样会被掐掉；反过来只调 timeout 不加心跳，中间网络设备（负载均衡、防火墙）也会静默丢弃长时间无流量的连接。</p>
+<h2>坑三：页面是 https，连接还在用 ws://</h2>
+<p>这个属于前端的低级错误，但现象很迷惑：浏览器控制台只报连接失败，看不出原因。</p>
+<p>https 页面里发起 <code>ws://</code> 请求会被当作混合内容直接拦截。正确做法是按当前协议动态选：</p>
+<pre><code class="language-js">const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+const socket = new WebSocket(proto + location.host + '/ws');
+</code></pre>
+<p>如果是跨域部署，还要注意后端允许的 <code>Origin</code> 白名单。</p>
+<h2>我的排查顺序</h2>
+<p>踩完之后总结了一套固定顺序，比瞎猜快很多：</p>
+<ol>
+<li><strong>先看握手响应码</strong>。<code>400</code> → 头没透传，查 <code>Upgrade</code>/<code>Connection</code>；<code>404</code> → 路径或 <code>context-path</code> 不对；<code>502</code> → 后端没起来或代理地址错。</li>
+<li><strong><code>101</code> 但立刻断</strong> → 看 Nginx 的 <code>error.log</code>，通常是 <code>upstream prematurely closed</code> 或超时。先用 <code>curl -i</code> 手动发一个带升级头的请求，确认后端行为。</li>
+<li><strong>稳定 60 秒断</strong> → 几乎可以断定是 <code>proxy_read_timeout</code>，配合心跳一起改。</li>
+<li><strong>浏览器直接报错、请求都没发出去</strong> → 查混合内容和 <code>Origin</code>。</li>
+</ol>
+<p>另外一个经验：<strong>服务端维护会话时一定要按业务维度分组</strong>（我是按设备 ID），否则广播的时候遍历所有 session 既慢又容易把已经断开的会话算进去。断线重连之后要先推一份最新快照，不然大屏会一直停在旧数据上，看起来像"系统卡住了"。</p>
+<hr />
+<p>这套配置现在跑在我自己的服务器上，坑是踩过了，但换个环境（比如上云之后前面多一层 SLB）大概还会遇到新问题。到时候再补。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/redis-logical-expire/index.html">← 缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

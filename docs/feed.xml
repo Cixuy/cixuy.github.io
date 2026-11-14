@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Cixuy</title>
+    <link>https://cixuy.github.io/</link>
+    <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
+    <language>zh-CN</language>
+    <lastBuildDate>Sat, 14 Nov 2026 17:12:29 +0800</lastBuildDate>
+    <item>
+      <title>WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</title>
+      <link>https://cixuy.github.io/posts/websocket-behind-nginx/index.html</link>
+      <guid>https://cixuy.github.io/posts/websocket-behind-nginx/index.html</guid>
+      <description>本地正常、上线就失败的典型场景：握手 400、连上 60 秒断、https 下直接连不上。逐条给出原因、配置和排查顺序。</description>
+    </item>    <item>
+      <title>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</title>
+      <link>https://cixuy.github.io/posts/redis-logical-expire/index.html</link>
+      <guid>https://cixuy.github.io/posts/redis-logical-expire/index.html</guid>
+      <description>两种方案对比、逻辑过期的实现方式，以及重建互斥、锁续期、线程池隔离、失败退避这四个必须处理的细节。</description>
+    </item>    <item>
+      <title>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</title>
+      <link>https://cixuy.github.io/posts/influxdb-vs-mysql-for-metrics/index.html</link>
+      <guid>https://cixuy.github.io/posts/influxdb-vs-mysql-for-metrics/index.html</guid>
+      <description>从单表膨胀的算账过程讲起，对比两种存储的适用边界，再记录 tag/field 设计、窗口聚合、数据过期这三处实际踩过的坑。</description>
+    </item>
+  </channel>
+</rss>

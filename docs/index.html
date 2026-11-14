@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="index.html">文章</a>
+      <a href="tags/index.html">标签</a>
+      <a href="about/index.html">关于</a>
+      <a href="feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <section class="hero">
+    <h1>Cixuy</h1>
+    <p class="lede">写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</p>
+    <div class="meta-line">
+      <span>Cixuy</span>
+      <span>Java 后端 · 2027 届</span>
+      <span><a href="https://github.com/cixuy">GitHub</a></span>
+      <span><a href="mailto:2515889741@qq.com">2515889741@qq.com</a></span>
+    </div>
+  </section>
+  <section>
+    <p class="section-label">文章 · 3 篇</p>
+<ul class="post-list">
+    <li class="post-item">
+      <time datetime="2026-11-14">2026 年 11 月 14 日</time>
+      <h2><a href="posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></h2>
+      <p>本地正常、上线就失败的典型场景：握手 400、连上 60 秒断、https 下直接连不上。逐条给出原因、配置和排查顺序。</p>
+      <div class="tags"><a class="tag" href="tags/index.html#websocket">WebSocket</a><a class="tag" href="tags/index.html#nginx">Nginx</a><a class="tag" href="tags/index.html#部署">部署</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-12">2026 年 11 月 12 日</time>
+      <h2><a href="posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></h2>
+      <p>两种方案对比、逻辑过期的实现方式，以及重建互斥、锁续期、线程池隔离、失败退避这四个必须处理的细节。</p>
+      <div class="tags"><a class="tag" href="tags/index.html#redis">Redis</a><a class="tag" href="tags/index.html#缓存">缓存</a><a class="tag" href="tags/index.html#并发">并发</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-09">2026 年 11 月 9 日</time>
+      <h2><a href="posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a></h2>
+      <p>从单表膨胀的算账过程讲起，对比两种存储的适用边界，再记录 tag/field 设计、窗口聚合、数据过期这三处实际踩过的坑。</p>
+      <div class="tags"><a class="tag" href="tags/index.html#influxdb">InfluxDB</a><a class="tag" href="tags/index.html#mysql">MySQL</a><a class="tag" href="tags/index.html#选型">选型</a></div>
+    </li>
+    </ul>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

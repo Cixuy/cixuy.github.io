@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</h1>
+      <div class="meta-line">
+        <span>2026 年 11 月 9 日</span>
+        <span>约 4 分钟</span>
+        <span class="tags"><a class="tag" href="../../tags/index.html#influxdb">InfluxDB</a><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#选型">选型</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>ServerOps 这个运维系统最初是"一套 MySQL 打天下"：服务器、告警、规则、指标，全塞进关系库。前两周跑得很好，问题是在第三个月暴露的。</p>
+<h2>MySQL 是什么时候开始撑不住的</h2>
+<p>算一笔账：假设 50 台机器，每台 30 个指标，采集周期 5 秒。</p>
+<pre><code>50 × 30 × (86400 / 5) ≈ 2592 万行 / 天
+</code></pre>
+<p>一个月七亿多行。这张表很快出现三个症状：</p>
+<ol>
+<li><strong>写入开始抖</strong>。指标是批量 insert，单表索引维护成本随数据量线性上升，高峰期写入延迟明显。</li>
+<li><strong>时间范围聚合变慢</strong>。"最近 24 小时 CPU 趋势"这种查询要做 <code>WHERE time BETWEEN ... GROUP BY 5min</code>，在没有覆盖索引的情况下基本是全表扫。</li>
+<li><strong>删除历史数据很痛</strong>。<code>DELETE FROM metric WHERE time &lt; ...</code> 会锁大量行、产生巨量 undo，跑一次能把主从延迟拉到几分钟。</li>
+</ol>
+<p>第 3 点是最要命的 —— 指标数据 99% 的价值在最近两周，老数据必须清，但 MySQL 清数据的方式不适合这个模式。</p>
+<h2>为什么时序库处理这类场景更自然</h2>
+<p>时序数据库的几个设计前提正好对上指标数据：</p>
+<ul>
+<li>写入是<strong>追加</strong>为主，几乎不更新</li>
+<li>查询总是<strong>按时间范围</strong> + 按维度聚合</li>
+<li>数据有明确的生命周期，<strong>过期就该自动消失</strong></li>
+</ul>
+<p>InfluxDB 在这三点上都是原生支持：按时间分区存储、<code>aggregateWindow</code> 直接在窗口上聚合、retention policy 自动过期。特别是最后一条，把"手动清数据"这个运维负担直接消掉了。</p>
+<p>所以我最终的分工是：</p>
+<ul>
+<li><strong>MySQL</strong> 存业务数据：服务器台账、用户、告警事件、自愈规则 —— 有关系、要事务、要 join</li>
+<li><strong>InfluxDB</strong> 存指标：CPU、内存、磁盘、网络 —— 只追加、按时间查、会过期</li>
+</ul>
+<h2>坑一：把高基数字段做成了 tag</h2>
+<p>这是新手最容易犯的错，而且后果很严重。</p>
+<p>InfluxDB 的 <code>tag</code> 是索引字段，每个 tag 值的组合会形成一条独立的 series。<strong>series 数量爆炸，内存直接被吃光。</strong></p>
+<p>我当时把一个本该是 field 的东西写成了 tag：采集批次 ID。每批数据都不一样，等于每 5 秒新增几百个 series，跑了一天内存就满了。</p>
+<p>判断标准很简单：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>tag</th>
+<th>field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用来做什么</td>
+<td><code>WHERE</code> 过滤、<code>GROUP BY</code></td>
+<td>数值计算、聚合</td>
+</tr>
+<tr>
+<td>值的特点</td>
+<td>基数低、可枚举</td>
+<td>可以是任意值</td>
+</tr>
+<tr>
+<td>典型例子</td>
+<td>机器 ID、机房、指标名</td>
+<td>CPU 使用率、内存字节数</td>
+</tr>
+<tr>
+<td>绝对不能放</td>
+<td>时间戳、请求 ID、PID、UUID</td>
+<td>——</td>
+</tr>
+</tbody>
+</table>
+<p>写进去之前先问一句：<strong>这个字段的取值能不能列出来？</strong> 列不出来就放 field。</p>
+<h2>坑二：<code>aggregateWindow</code> 的窗口边界</h2>
+<p>查"最近一小时 CPU 均值，5 分钟一个点"：</p>
+<pre><code class="language-flux">from(bucket: &quot;metrics&quot;)
+  |&gt; range(start: -1h)
+  |&gt; filter(fn: (r) =&gt; r._measurement == &quot;cpu&quot; and r._field == &quot;usage&quot;)
+  |&gt; aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+</code></pre>
+<p>两个参数值得注意：</p>
+<ul>
+<li><code>createEmpty: false</code>：默认是 <code>true</code>，会把没有数据的窗口补成空行，前端画图会出现断点或者 0 值，看起来像"机器挂了"。设成 <code>false</code> 才是"没数据就不画"。</li>
+<li>窗口是<strong>按时间戳对齐</strong>的，不是从你查询的起点开始切。所以"最近 1 小时"的首尾两个窗口可能是不完整的，算出来的均值会偏。如果对趋势判断敏感，查询范围要比展示范围多取一个窗口，画图时再裁掉。</li>
+</ul>
+<h2>坑三：保留策略比手动清理靠谱得多</h2>
+<p>一开始我写了个定时任务，每天删 30 天前的数据。后来发现两件事：一是删除本身很慢，二是<strong>删完之后磁盘并不会立刻释放</strong>（底层 compaction 需要时间）。</p>
+<p>换成 bucket 级别的 retention 之后，删除变成了元数据操作，数据到期自动淘汰，磁盘空间由后台任务回收，代码里那几百行清理逻辑全部删掉。</p>
+<pre><code class="language-bash"># 30 天自动过期
+influx bucket create -n metrics -r 720h
+</code></pre>
+<p>如果不同指标的生命周期不一样（原始数据留 7 天，聚合后的小时级数据留一年），建两个 bucket 分开写，不要挤在一个里面。</p>
+<h2>最后的选择建议</h2>
+<p>不是所有项目都需要上时序库。我的判断顺序是：</p>
+<ol>
+<li><strong>数据量小、查询简单</strong> → MySQL 就够，别为了技术栈好看引入新组件</li>
+<li><strong>写入频繁但只查最近几天</strong> → 先考虑 MySQL 分区表 + 定期 drop partition（比 delete 快几个数量级）</li>
+<li><strong>写入量大 + 按时间聚合 + 需要自动过期</strong> → 上时序库，收益明显</li>
+</ol>
+<p>另外补一句：引入第二个存储之后，<strong>一致性就是你要自己扛的事了</strong>。MySQL 里删了一台服务器，InfluxDB 里它的历史指标还在 —— 要么接受这个不一致（大多数监控场景可以接受），要么在业务层做级联清理。这个成本在选型时容易被忽略。</p>
+<hr />
+<p>数据量那块我按 50 台机器估算的，真实环境扩容到 【填入实际规模】 之后，写入延迟是 【填入实测值】。如果你也在做类似的系统，先把自己的量级算清楚再选，别照着别人的架构抄。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/redis-logical-expire/index.html">下一篇：缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</h1>
+      <div class="meta-line">
+        <span>2026 年 11 月 12 日</span>
+        <span>约 4 分钟</span>
+        <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#缓存">缓存</a><a class="tag" href="../../tags/index.html#并发">并发</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>设备状态和权限字典在智慧工地项目里是被高频读的：大屏每几秒刷一次，每个接口都要查当前用户权限。这类数据变化不频繁，放进 Redis 很合适，问题是<strong>热点 key 过期的那一刻</strong>——如果几千个请求同时发现缓存没了，会一起打到 MySQL 上。</p>
+<h2>两种方案，先想清楚要什么</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>互斥锁（SETNX）</th>
+<th>逻辑过期</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一致性</td>
+<td>强，一定返回最新值</td>
+<td>弱，可能返回旧值</td>
+</tr>
+<tr>
+<td>可用性</td>
+<td>差，抢不到锁的请求要等待</td>
+<td>好，永远立即返回</td>
+</tr>
+<tr>
+<td>实现复杂度</td>
+<td>低</td>
+<td>中</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>金额、库存等不能读旧值的</td>
+<td>状态、配置、字典等能容忍短暂不一致的</td>
+</tr>
+</tbody>
+</table>
+<p>我选的是逻辑过期：设备状态晚 100ms 更新，业务上完全无所谓，但接口不能被阻塞。</p>
+<p>思路是 <strong>value 里不放 TTL，而是放一个 <code>expireAt</code> 字段</strong>，key 本身永不过期。读到数据后先判断 <code>expireAt</code>：</p>
+<ul>
+<li>没过期 → 直接返回</li>
+<li>已过期 → <strong>先把旧值返回给调用方</strong>，同时提交一个异步任务去重建缓存</li>
+</ul>
+<h2>坑一：异步重建没有互斥，DB 被打得更惨</h2>
+<p>第一版很天真：发现过期就 <code>executor.submit(() -&gt; rebuild(key))</code>。结果是过期瞬间，100 个请求各自提交了重建任务，<strong>100 个线程同时查同一个 DB</strong> —— 比不用缓存还糟。</p>
+<p>重建必须互斥，用 Redisson：</p>
+<pre><code class="language-java">public void rebuild(String key) {
+    RLock lock = redissonClient.getLock(&quot;lock:&quot; + key);
+    // waitTime=0：拿不到锁直接返回，不排队
+    // leaseTime 不传，交给看门狗自动续期
+    if (!lock.tryLock(0, TimeUnit.SECONDS)) {
+        return;
+    }
+    try {
+        Object latest = loadFromDb(key);
+        redis.opsForValue().set(key, new CacheWrapper(latest, System.currentTimeMillis() + TTL));
+    } finally {
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
+    }
+}
+</code></pre>
+<p>注意 <code>tryLock</code> 的第一个参数用 <code>0</code>：<strong>抢不到锁就直接放弃</strong>，因为旧值已经返回给用户了，这次重建失败不影响正确性，下一次请求还会再触发。</p>
+<h2>坑二：锁的租期小于重建耗时，锁提前释放</h2>
+<p>这是我第二版的问题。当时为了"避免死锁"，给锁显式设了 <code>leaseTime = 3s</code>。但重建逻辑里有一次全量查询，慢的时候要 5 秒 —— 锁在第 3 秒就被释放了，第二个线程进来又开一份重建，互斥形同虚设。</p>
+<p>两种解法：</p>
+<ul>
+<li><strong>不传 <code>leaseTime</code></strong>，用 Redisson 的看门狗（默认 30 秒，每 10 秒续一次），业务没跑完锁就不会掉</li>
+<li>或者显式给足时间，但必须大于重建耗时的上限 —— 而这个上限你往往估不准</li>
+</ul>
+<p>我最后选了看门狗。代价是如果进程直接 kill -9，锁要等 30 秒才自然过期，不过对重建场景无所谓。</p>
+<h2>坑三：线程池用错了，异步任务反而拖垮主流程</h2>
+<p>一开始图省事用了 <code>CompletableFuture.runAsync(...)</code>，它跑在 <code>ForkJoinPool.commonPool()</code> 上 —— 这是整个 JVM 共享的池子，默认并行度只有 CPU 核数 - 1。压测时重建任务把 commonPool 占满，<strong>其他异步逻辑（包括日志、通知）开始排队</strong>。</p>
+<p>改成专用线程池，并且队列满了要有明确的拒绝策略：</p>
+<pre><code class="language-java">ThreadPoolExecutor rebuildPool = new ThreadPoolExecutor(
+    4, 8, 60L, TimeUnit.SECONDS,
+    new ArrayBlockingQueue&lt;&gt;(200),
+    new ThreadFactoryBuilder().setNameFormat(&quot;cache-rebuild-%d&quot;).build(),
+    new ThreadPoolExecutor.DiscardPolicy()  // 丢弃 + 打日志，不要 CallerRuns
+);
+</code></pre>
+<p>拒绝策略这里有个反直觉的点：<strong>不要用 <code>CallerRunsPolicy</code></strong>。它会让提交任务的线程（也就是处理用户请求的 Tomcat 线程）自己去重建缓存，一个本该 10ms 返回的接口突然变成 500ms。丢弃 + 告警，让下一次请求重试，反而更稳。</p>
+<h2>坑四：重建失败后 <code>expireAt</code> 没更新，每秒都在打 DB</h2>
+<p>如果 <code>loadFromDb</code> 抛异常（DB 抖动、超时），<code>expireAt</code> 还是过期状态，下一个请求判定过期 → 再提交重建 → 再失败。<strong>一个写坏的 key 会变成每秒一次的 DB 查询</strong>，而且是无限循环。</p>
+<p>修法是失败也要"续一段命"，做个退避：</p>
+<pre><code class="language-java">catch (Exception e) {
+    log.error(&quot;cache rebuild failed, key={}&quot;, key, e);
+    // 保留旧值，但把过期时间往后推 30 秒，避免密集重试
+    redis.opsForValue().set(key, new CacheWrapper(oldValue, System.currentTimeMillis() + 30_000));
+}
+</code></pre>
+<p>这一步不加，监控上看不出问题，但 DB 的 QPS 会莫名其妙多出一截 —— 我是在看慢查询日志时才发现有个 key 在反复被查。</p>
+<h2>顺带说雪崩</h2>
+<p>逻辑过期只解决"单个热点 key"的问题。如果大量 key 在同一时刻过期（比如服务重启后统一加载），还是会撞在一起。办法是<strong>基础 TTL 加随机抖动</strong>：</p>
+<pre><code class="language-java">long ttl = BASE_TTL + ThreadLocalRandom.current().nextLong(-BASE_TTL / 10, BASE_TTL / 10);
+</code></pre>
+<p>另外缓存整体不可用（Redis 挂了）时要有降级：直接查库 + 限流，别让请求全压到 MySQL 上把数据库一起带走。</p>
+<h2>小结</h2>
+<p>逻辑过期的核心不是"异步重建"这四个字，而是围绕它的一圈配套：<strong>重建互斥、锁续期、线程池隔离、失败退避</strong>。少任何一个，方案都会在压测或者线上某一刻失效。</p>
+<p>至于具体数值，建议自己压一遍再决定 —— 我的 P95 和命中率是在 【填入你的实测值】 之后才定下来的，别人环境里的数字对你不一定有参考价值。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">← MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <a href="../../posts/websocket-behind-nginx/index.html">下一篇：WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
