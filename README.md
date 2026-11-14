@@ -1,0 +1,90 @@
+# 技术博客
+
+一个零构建依赖的静态博客：文章写 Markdown，跑一条命令生成 `docs/`，推到 GitHub 就上线。
+
+- 纯静态 HTML，不需要 Node / 不需要 CI
+- 自带深色模式、RSS、标签页、404
+- 中文排版按阅读优化（行高 1.85、正文 16.5px）
+- 唯一的依赖是 Python 的 `markdown` 库
+
+## 本地跑起来
+
+```bash
+pip install markdown
+python3 build.py --serve
+```
+
+打开 http://127.0.0.1:8088
+
+改完文章重新跑 `python3 build.py` 就行，`--serve` 只是顺便起个预览服务。
+
+## 写一篇新文章
+
+在 `posts/` 下新建 `你的-slug.md`，**文件名就是 URL**（比如 `redis-lock.md` → `/posts/redis-lock/`）。
+
+头部固定这几行：
+
+```markdown
+---
+title: 文章标题
+date: 2026-11-20
+summary: 一句话摘要，显示在列表页和 RSS
+tags: Redis, 并发
+draft: false
+---
+
+正文从这里开始。
+```
+
+- `draft: true` 的文章不会被生成，方便存草稿
+- `posts/_模板.md` 是一份可以直接抄的结构，别删（它是 draft 状态，不会输出）
+- 支持代码块、表格、引用、图片、列表（Markdown 标准语法 + fenced code）
+
+## 发布到 GitHub Pages
+
+1. 在 GitHub 建一个**空仓库**，名字用 `<用户名>.github.io`（这样访问地址就是 `https://<用户名>.github.io`，没有子路径）。**README、.gitignore、License 三个勾都不要勾**，否则会和本地历史冲突
+2. 仓库建好后，在本目录执行两条命令：
+
+```bash
+git remote add origin https://github.com/cixuy/cixuy.github.io.git
+git push -u origin main
+```
+
+第一次 push 会弹浏览器让你授权，点一下就行 —— 不用手动生成 token，也不用输密码。
+
+3. 仓库 → Settings → Pages → Source 选 **Deploy from a branch**，Branch 选 `main`，目录选 **`/docs`**，保存。
+
+等一两分钟，`https://cixuy.github.io` 就能访问了。
+
+> **注意**：`.nojekyll` 文件已经生成在 `docs/` 里了，别删。它会关掉 GitHub 的 Jekyll 处理，否则下划线开头的文件会被忽略。
+
+如果仓库名不是 `<用户名>.github.io`（比如叫 `blog`），访问地址会变成 `https://<用户名>.github.io/blog/`。站点内部的链接全是相对路径，不用改配置 —— 但 `build.py` 里 `SITE["url"]` 要同步改，否则 RSS 里的链接是错的。
+
+## 上线前必改
+
+`build.py` 顶部的 `SITE` 字典（现在填的是 `cixuy`，换账号的话记得同步）：
+
+```python
+SITE = {
+    "name": "Cixuy",
+    "url": "https://cixuy.github.io",
+    "github": "https://github.com/cixuy",
+    ...
+}
+```
+
+同时把 `pages/about.md` 里的 GitHub 链接换掉。
+
+## 目录结构
+
+```
+博客/
+├── build.py          生成脚本
+├── posts/            文章源文件（Markdown）
+│   └── _模板.md
+├── pages/            独立页面（关于等）
+├── assets/           样式和脚本
+└── docs/             生成产物，这个目录才是要部署的
+```
+
+**只改 `posts/`、`pages/`、`assets/` 和 `build.py`，不要手改 `docs/`** —— 每次构建都会整个删掉重建。
