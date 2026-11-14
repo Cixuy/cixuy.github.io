@@ -165,7 +165,7 @@ def load_posts():
             "slug": f.stem,
             "title": meta.get("title", f.stem),
             "date": date,
-            "updated": meta.get("updated", ""),
+            "updated": meta.get("updated", "") or date,
             "series": meta.get("series", ""),
             "summary": meta.get("summary", ""),
             "tags": tags,
@@ -183,10 +183,14 @@ def build_index(posts):
             tags_html = "".join(
                 f'<a class="tag" href="tags/index.html#{slugify_tag(t)}">{esc(t)}</a>' for t in p["tags"]
             )
+            meta_extra = ""
+            if p["updated"] != p["date"]:
+                meta_extra = f'<div class="post-meta">更新于 {fmt_date(p["updated"])}</div>'
             items.append(f"""    <li class="post-item">
       <time datetime="{p['date']}">{fmt_date(p['date'])}</time>
       <h2><a href="{post_url(p)}">{esc(p['title'])}</a></h2>
       <p>{esc(p['summary'])}</p>
+      {meta_extra}
       <div class="tags">{tags_html}</div>
     </li>""")
         list_html = '<ul class="post-list">\n' + "\n".join(items) + "\n    </ul>"
@@ -230,15 +234,12 @@ def build_post(p, posts):
             f'<a class="tag tag-series" href="../../series/index.html#{slugify_tag(p["series"])}">'
             f'系列 · {esc(p["series"])}（{len(same)} 篇）</a>'
         )
-    updated_html = ""
-    if p["updated"] and p["updated"] != p["date"]:
-        updated_html = f"<span>最后更新 {fmt_date(p['updated'])}</span>"
     body = f"""  <article class="article">
     <header class="article-head">
       <h1>{esc(p['title'])}</h1>
       <div class="meta-line">
-        <span>{fmt_date(p['date'])}</span>
-        {updated_html}
+        <span>创建 {fmt_date(p['date'])}</span>
+        <span>更新 {fmt_date(p['updated'])}</span>
         <span>约 {p['minutes']} 分钟</span>
         {series_html}
         <span class="tags">{tags_html}</span>
