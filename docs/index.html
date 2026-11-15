@@ -47,8 +47,15 @@
     </div>
   </section>
   <section>
-    <p class="section-label">文章 · 3 篇</p>
+    <p class="section-label">文章 · 4 篇</p>
 <ul class="post-list">
+    <li class="post-item">
+      <time datetime="2026-11-15">2026 年 11 月 15 日</time>
+      <h2><a href="posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></h2>
+      <p>两个账号同时操作，一个看到了另一个的数据。本地怎么都复现不了，根因是 Tomcat 线程池复用线程时上一次的 ThreadLocal 没被清掉。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#java">Java</a><a class="tag" href="tags/index.html#并发">并发</a><a class="tag" href="tags/index.html#threadlocal">ThreadLocal</a></div>
+    </li>
     <li class="post-item">
       <time datetime="2026-11-14">2026 年 11 月 14 日</time>
       <h2><a href="posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></h2>

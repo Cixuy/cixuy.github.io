@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 15 日</span>
+        <span>更新 2026 年 11 月 15 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#缓存与并发">系列 · 缓存与并发（2 篇）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#java">Java</a><a class="tag" href="../../tags/index.html#并发">并发</a><a class="tag" href="../../tags/index.html#threadlocal">ThreadLocal</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>这个问题是我在给权限模块加上下文透传之后出现的，表现非常吓人：测试同事用 A 账号登录，刷新列表页，有几行数据显示的是 B 账号的信息。</p>
+<p>第一反应是 SQL 写错了，或者前端缓存了旧数据。查了半天都不是。最后是在日志里发现线索：<strong>那条请求打印出来的 userId 是 B 的，但当时登录的是 A。</strong></p>
+<h2>为什么本地永远复现不了</h2>
+<p>因为本地开发时请求量小，每次请求大概率拿到一个新线程。而线上 Tomcat 的线程池里有几百个线程反复复用，只有"同一个线程上一次处理的请求没清理上下文"的时候才会出问题。</p>
+<p>复现方法很简单：把 Tomcat 的最大线程数调到 1，然后连续发两个不同账号的请求。</p>
+<pre><code class="language-yaml">server:
+  tomcat:
+    threads:
+      max: 1
+</code></pre>
+<p>第二个请求立刻会拿到第一个请求的 userId。这个实验很有价值 —— 它把"偶发"变成了"必现"，你才能真正确定根因。</p>
+<h2>根因</h2>
+<p>我当时的写法是这样：</p>
+<pre><code class="language-java">public class UserContext {
+    private static final ThreadLocal&lt;LoginUser&gt; HOLDER = new ThreadLocal&lt;&gt;();
+
+    public static void set(LoginUser user) { HOLDER.set(user); }
+    public static LoginUser get() { return HOLDER.get(); }
+}
+</code></pre>
+<p>拦截器里 <code>set</code>，业务里 <code>get</code>，但<strong>没有任何地方 <code>remove</code></strong>。</p>
+<p>Tomcat 的线程是复用的：请求结束后线程回到池里，<code>ThreadLocal</code> 的值还挂在线程的 <code>ThreadLocalMap</code> 上。下一个请求分到同一个线程，读到的就是上一个用户的身份。</p>
+<p>这里有个容易误解的点：<code>ThreadLocal</code> 的 key 是弱引用，很多人以为"GC 会帮我清掉"。不会 —— 弱引用回收的是 key（ThreadLocal 对象本身），而 <strong>value 是强引用，会一直活到线程结束</strong>。所以这既是串号问题，也是内存泄漏问题。</p>
+<h2>修法</h2>
+<p>最小改动是在拦截器里配对清理：</p>
+<pre><code class="language-java">@Override
+public void afterCompletion(HttpServletRequest req, HttpServletResponse resp,
+                            Object handler, Exception ex) {
+    UserContext.clear();   // 内部调用 HOLDER.remove()
+}
+</code></pre>
+<p>但只加 <code>remove</code> 还不够稳 —— 只要有人写了个新拦截器、或者在异步链路里漏了一次，问题就会回来。所以我后来改成了统一入口：</p>
+<pre><code class="language-java">public final class UserContext {
+    private static final ThreadLocal&lt;LoginUser&gt; HOLDER = new ThreadLocal&lt;&gt;();
+
+    public static void run(LoginUser user, Runnable task) {
+        HOLDER.set(user);
+        try {
+            task.run();
+        } finally {
+            HOLDER.remove();
+        }
+    }
+
+    public static LoginUser get() { return HOLDER.get(); }
+}
+</code></pre>
+<p>把 <code>set</code> 变成私有的，外部只能通过 <code>run</code> 使用，生命周期由这一个方法兜住。<strong>能编译通过的写法就不容易忘。</strong></p>
+<h2>第二个坑：异步线程里拿不到</h2>
+<p>后面加异步任务（比如告警推送）时又踩了一次：在 <code>@Async</code> 方法里 <code>UserContext.get()</code> 返回 null。</p>
+<p>原因是 <code>ThreadLocal</code> 是线程私有的，线程池里的线程跟提交任务的线程不是同一个。<code>InheritableThreadLocal</code> 也解决不了 —— 它只在线程<strong>创建</strong>时继承，而线程池的线程是早就创建好的。</p>
+<p>三种办法：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>显式传参</td>
+<td>最土也最可靠，把 user 作为方法参数传进去</td>
+</tr>
+<tr>
+<td><code>TransmittableThreadLocal</code></td>
+<td>阿里开源的 TTL，配合它的线程池包装器使用</td>
+</tr>
+<tr>
+<td>手动透传</td>
+<td>提交任务前 <code>get</code> 出来，在任务里 <code>set</code>，用完 <code>remove</code></td>
+</tr>
+</tbody>
+</table>
+<p>我选了显式传参 —— 异步任务里本来就不该依赖隐式的上下文，依赖了就会出一个很难查的 bug。</p>
+<h2>小结</h2>
+<p><code>ThreadLocal</code> 的问题不在于用法，在于<strong>生命周期没人管</strong>。写的时候只要记住两句话：</p>
+<ol>
+<li><strong>谁 set 谁 remove</strong>，而且必须放在 <code>finally</code> 里</li>
+<li><strong>跨线程不传值</strong>，异步场景显式传参</li>
+</ol>
+<p>最后一句经验：这类"偶发串号"的问题，只要能构造出多线程交替执行的环境，就一定能稳定复现。别在单线程的本地环境里跟自己较劲。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/websocket-behind-nginx/index.html">← WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
