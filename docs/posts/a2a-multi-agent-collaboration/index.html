@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>从 MCP 到 A2A：多 Agent 协作到底难在哪 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="从 MCP 到 A2A：多 Agent 协作到底难在哪 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>从 MCP 到 A2A：多 Agent 协作到底难在哪</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 16 日</span>
+        <span>更新 2026 年 11 月 16 日</span>
+        <span>约 4 分钟</span>
+        <a class="tag tag-series" href="../../series/a2a-与多-agent-协作/index.html">专栏 · A2A 与多 Agent 协作（1 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#a2a">A2A</a><a class="tag" href="../../tags/index.html#mcp">MCP</a><a class="tag" href="../../tags/index.html#多智能体">多智能体</a><a class="tag" href="../../tags/index.html#go">Go</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/a2a-与多-agent-协作/index.html">A2A 与多 Agent 协作</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/a2a-multi-agent-collaboration/index.html">从 MCP 到 A2A：多 Agent 协作到底难在哪</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>MCP 那套做完之后，我一直有个疑问：既然每个 Agent 都能调工具了，为什么还需要 A2A？</p>
+<p>直到把「企业 IT 服务台」这个场景写了一遍才明白——<strong>MCP 解决的是"一个 Agent 内部怎么用工具"，A2A 解决的是"多个 Agent 之间怎么交接任务"</strong>。前者是纵向的，后者是横向的，两者不冲突，也互相替代不了。</p>
+<h2>先把边界划清楚</h2>
+<p>员工报一句"打印机连不上"，现实里的处理链路是这样的：</p>
+<ol>
+<li>先判断是设备问题还是流程问题</li>
+<li>是设备问题就去看队列、驱动、网络——这需要监控数据</li>
+<li>知道根因之后再去手册里找处置步骤</li>
+<li>处理不了就建单，带 SLA</li>
+</ol>
+<p>四步里每一步的知识边界都不一样。硬塞给一个大模型，它答不准也没人担责；拆成几个专职 Agent，每个都小而准，但<strong>谁来分派、谁能调谁、出事怎么查</strong>就成了新问题。</p>
+<p>这就是 A2A 的位置。它不管 Agent 内部怎么思考，只管一件事：<strong>A 能不能把任务交给 B，并且知道 B 干完了没有、干出了什么</strong>。</p>
+<h2>A2A 的三个核心概念</h2>
+<p><strong>Agent Card</strong>：每个 Agent 暴露一张名片，在 <code>/.well-known/agent-card.json</code>。写清楚自己叫什么、会哪些技能、支持什么输入输出模态。网关启动时拉一遍名片就完成注册，不需要额外的注册中心。</p>
+<p><strong>Task</strong>：任务是一次协作的载体，有 ID、有状态机（<code>submitted → working → completed / failed / canceled</code>）、有 history、有 artifacts。跟 HTTP 请求最大的区别是<strong>任务是有生命周期的</strong>，可以查询、可以取消、可以中途汇报进度。</p>
+<p><strong>SSE 流式</strong>：任务状态变化通过 <code>text/event-stream</code> 推给调用方，而不是让调用方轮询。多跳转发时这一层最容易出问题——上游断开、下游还在跑，任务状态就悬在中间。</p>
+<h2>协议一天能写完，治理要一周</h2>
+<p>第一版我按规范把 JSON-RPC 的 <code>message/send</code>、<code>tasks/get</code>、<code>tasks/cancel</code> 和 SSE 都实现了，跑通"一句话两跳"只用了半天。剩下的时间全花在这几件事上：</p>
+<p><strong>幂等</strong>。用户在弱网下点两次发送，不能建两张工单。做法是拿 <code>messageId</code> 做幂等键，映射到 taskId；索引跟任务一起落盘，重启后依然生效。这里有个细节：幂等要在<strong>建任务之前</strong>判断，不是执行完之后返回旧结果——否则两次并发请求还是会各跑一遍。</p>
+<p><strong>配额</strong>。一个 Agent 被上游疯狂调用，会把后面的任务全堵死。给每个 Agent 独立令牌桶，超额直接拒绝，并在审计里标 <code>rejected</code>。注意配额拒绝<strong>不该重试</strong>，重试只会把压力再送一遍。</p>
+<p><strong>部分降级</strong>。两跳里第二跳失败了，任务不能整体标失败——第一跳的诊断结论是有价值的。现在的做法是标"部分降级完成"，附一句"结论仅基于成功的那一跳"，让调用方自己判断够不够用。</p>
+<p><strong>落盘与恢复</strong>。任务状态每变一次就原子写一次（写 <code>.tmp</code> 再 <code>rename</code>），带 80ms 防抖。演示时直接 <code>kill</code> 掉进程再重启，任务和幂等索引都还在——这一条比任何性能数字都有说服力，因为它证明的是"这套东西敢上生产"。</p>
+<p><strong>审计</strong>。每次跨 Agent 调用记一条 hop：谁调的、哪个技能、耗时多少、第几次尝试、产出是什么。界面上渲染成瀑布图。企业采购看的就是这一条——出事能不能查。</p>
+<h2>三个真实的坑</h2>
+<p><strong>监听地址写成 URL</strong>。<code>card.URL</code> 是 <code>http://127.0.0.1:18091</code>，我直接塞给了 <code>http.Server{Addr: ...}</code>，三个下游全部静默失败，注册表空得像没写代码。错误被 <code>ListenAndServe</code> 的返回值吞掉了，因为我在 goroutine 里没处理它。</p>
+<p><strong>JSON-RPC 的 result 用了 <code>any</code></strong>。解析下游响应时我写 <code>rpc.Result.(json.RawMessage)</code>，但 <code>encoding/json</code> 解到 <code>any</code> 里是 <code>map[string]any</code>，断言直接 panic——而且是在任务 goroutine 里 panic，把整个网关带走了。修法是字段类型改成 <code>json.RawMessage</code>，另外给任务 goroutine 加 <code>recover</code>，一个任务出错不该影响服务。</p>
+<p><strong>前端 <code>hops</code> 是 null</strong>。Go 里 nil slice 序列化成 <code>null</code> 而不是 <code>[]</code>，前端 <code>null.map()</code> 直接报错。这类问题不加防护就会在"空数据"这个最不该崩的场景崩掉。</p>
+<h2>实测</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>设备类报障</td>
+<td>两跳：诊断 157ms + 知识库 95ms，返回两份产出</td>
+</tr>
+<tr>
+<td>账号类报障</td>
+<td>两跳：知识库 + 工单，自动建单，SLA 4 小时</td>
+</tr>
+<tr>
+<td>同一 messageId 重复提交</td>
+<td>幂等命中，返回同一 taskId，未重复执行</td>
+</tr>
+<tr>
+<td>SSE 订阅</td>
+<td>依次收到 working ×5 → completed</td>
+</tr>
+<tr>
+<td>进程 kill 后重启</td>
+<td>3 条任务全部恢复，幂等索引仍生效</td>
+</tr>
+</tbody>
+</table>
+<h2>还没做的</h2>
+<ul>
+<li><strong>注册准入</strong>：现在是"知道地址就能注册"，生产环境要防能力声明造假（自称会诊断，其实乱答）</li>
+<li><strong>按 Agent 熔断</strong>：连续失败应该自动摘除一段时间，现在只会一跳一跳地失败</li>
+<li><strong>多实例</strong>：单机部署没问题，多网关实例要加分布式锁，否则同一任务会被跑两遍</li>
+<li><strong>trace 回放</strong>：现在能看到每跳耗时，但不能重跑某一跳做对比</li>
+</ul>
+<h2>一句话总结</h2>
+<p>A2A 的价值不在协议本身——协议一天就能实现完。它的价值是把"多个 Agent 协作"从一堆口头约定，变成了<strong>可发现、可治理、可审计的工程问题</strong>。而这三件事，恰恰是 demo 和生产的分界线。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/agent-eval-loop/index.html">← 改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
