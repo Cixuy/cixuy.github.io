@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MySQL 分表后的分页与聚合：跨表查询的三种处理方式 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="MySQL 分表后的分页与聚合：跨表查询的三种处理方式 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>MySQL 分表后的分页与聚合：跨表查询的三种处理方式</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 16 日</span>
+        <span>更新 2026 年 11 月 16 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#存储选型">系列 · 存储选型（2 篇）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#分表">分表</a><a class="tag" href="../../tags/index.html#分页">分页</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>ServerOps 里操作日志涨得最快，一个月就过了千万。按时间分表（<code>op_log_202608</code>、<code>op_log_202609</code>……）之后写入压力下来了，但后台的日志列表页挂了。</p>
+<p>原因很直接：原来一句 <code>SELECT * FROM op_log ORDER BY create_time DESC LIMIT 20</code> 解决的事，现在要跨十几张表。</p>
+<h2>三个具体问题</h2>
+<p><strong>1. 分页怎么翻。</strong> <code>LIMIT offset, size</code> 在单表里就是跳过 offset 行，跨表就没法这么写 —— 每个表的 offset 分布不一样。</p>
+<p><strong>2. 总数怎么算。</strong> 前端要显示"共 N 条"。单表 <code>COUNT(*)</code> 已经是全表扫，跨十几张表就是十几倍。</p>
+<p><strong>3. 排序怎么做。</strong> 需要按时间倒序取最新 20 条，得从每张表各取 20 条再归并，不能只查最后一张表（虽然理论上最新数据都在最新的表里，但表边界附近会有跨表的情况）。</p>
+<h2>方案一：并行查询 + 内存归并</h2>
+<p>适合<strong>浅分页</strong>（前几十页）。</p>
+<p>思路：每张表都按同样的条件查 <code>LIMIT 0, offset+size</code>，然后在内存里归并排序，最后截取目标区间。</p>
+<pre><code class="language-java">// 每张表各取前 (offset + size) 条，线程池并行
+List&lt;Log&gt; merged = tables.parallelStream()
+    .map(t -&gt; query(t, orderByTimeDesc, offset + size))
+    .flatMap(List::stream)
+    .sorted(comparing(Log::getCreateTime).reversed())
+    .skip(offset)
+    .limit(size)
+    .collect(toList());
+</code></pre>
+<p>代价很明确：<strong>表越多、翻得越深，代价越大</strong>。翻到第 10 页，每张表都要扫 200 行，20 张表就是 4000 行。所以这个方案只适合"用户不会翻太深"的场景，我给它加了硬限制：只允许翻前 50 页。</p>
+<p>数量统计单独处理 —— 用每张表的 <code>COUNT(*)</code> 累加，但<strong>加缓存</strong>，缓存 5 分钟。管理员看到的总数是"5 分钟前的"，这个精度对日志列表完全够用。</p>
+<h2>方案二：游标分页（seek method）</h2>
+<p>适合<strong>无限滚动</strong>，也是我现在用的方式。</p>
+<p>不分页，改成"从哪一条之后继续取"：</p>
+<pre><code class="language-sql">SELECT * FROM op_log_202608
+WHERE (create_time, id) &lt; ('2026-11-14 10:00:00', 1024)
+ORDER BY create_time DESC, id DESC
+LIMIT 20;
+</code></pre>
+<p>用 <code>(create_time, id)</code> 做联合游标，是因为同一秒可能有多条日志，只用时间会漏数据或者重复。加 <code>id</code> 保证唯一。</p>
+<p>好处是<strong>翻到第几页都是同样的代价</strong>，不随 offset 增长。坏处是<strong>不能跳到第 7 页</strong> —— 前端交互要改成"加载更多"。</p>
+<p>管理后台这个改动我跟产品争了两句，最后他接受了：日志这种数据，用户实际行为就是"看最新的"或者"按条件搜"，没人真的点到第 30 页。</p>
+<h2>方案三：单独建一张索引表</h2>
+<p>适合<strong>真的需要任意翻页 + 复杂筛选</strong>的场景。</p>
+<p>把查询条件需要的字段（时间、操作人、模块、结果）单独维护到一张不分表的宽表里，分页在宽表上做，拿到 id 再回各分表取详情。</p>
+<p>代价是要维护两份数据，写入时多一次同步。<strong>如果你的筛选条件很复杂，这是唯一能撑住的方案</strong>；但简单场景下不值得。</p>
+<h2>我最后怎么选的</h2>
+<p>按场景拆开，不追求一个方案打天下：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日志列表（默认查看）</td>
+<td>游标分页，只提供"加载更多"</td>
+</tr>
+<tr>
+<td>按时间段/操作人筛选</td>
+<td>游标分页 + 索引表辅助</td>
+</tr>
+<tr>
+<td>总数统计</td>
+<td><code>COUNT(*)</code> 累加 + 5 分钟缓存</td>
+</tr>
+<tr>
+<td>导出 Excel</td>
+<td>异步任务，逐表读取写文件，不走分页</td>
+</tr>
+</tbody>
+</table>
+<p>导出那条特别说一下：原来是想复用列表的查询逻辑，结果导出 5 万条时直接 OOM。改成异步任务后，每张表读完就写一行到文件、清空集合，内存占用是平的。</p>
+<h2>几个容易忽略的细节</h2>
+<p><strong>表名要参数化。</strong> 分表后最常见的写法是字符串拼表名，<code>"op_log_" + month</code>。这既是 SQL 注入的口子，也让预编译失效。我的做法是表名从一个白名单枚举里取，拼之前校验格式必须是 <code>op_log_\d{6}</code>。</p>
+<p><strong>分表键要和查询条件对齐。</strong> 如果 90% 的查询都带时间范围，按时间分表是对的；如果大量查询是按操作人，那按时间分表反而每张表都要扫。<strong>分表键选错，后面所有优化都是补救</strong>。</p>
+<p><strong>跨表事务不存在。</strong> 分表之后写入是分片的，原来一个事务能保证的事现在保证不了。日志场景无所谓（写失败重试即可），但如果是有业务含义的数据，得想清楚补偿机制。</p>
+<h2>小结</h2>
+<p>分表本身不难，难的是<strong>分完之后原来那些"顺手就能写"的查询全部要重写</strong>。所以做决定之前先问自己：这张表的查询模式是什么？如果答案是"什么条件都可能查"，那可能不该分表，该做的是归档 —— 热数据留一张表，冷数据挪走。</p>
+<p>这两个思路经常被混淆：<strong>分表解决写入和存储，归档解决查询范围</strong>。搞反了就会像我第一版那样，问题一个没少。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/threadlocal-context-leak/index.html">← ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
