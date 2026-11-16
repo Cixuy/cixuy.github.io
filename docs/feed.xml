@@ -5,8 +5,23 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 16 Nov 2026 02:20:24 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 16 Nov 2026 11:44:37 +0800</lastBuildDate>
     <item>
+      <title>Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</title>
+      <link>https://cixuy.github.io/posts/cpp-reactor-return-vs-break/index.html</link>
+      <guid>https://cixuy.github.io/posts/cpp-reactor-return-vs-break/index.html</guid>
+      <description>健康检查接口不报错、不超时、也不返回数据，就是没反应。根因是一个循环里的 return 跳过了后面的发送逻辑。</description>
+    </item>    <item>
+      <title>自己写网关踩的两个坑：限流没生效，熔断不触发</title>
+      <link>https://cixuy.github.io/posts/gateway-limiter-breaker-pitfalls/index.html</link>
+      <guid>https://cixuy.github.io/posts/gateway-limiter-breaker-pitfalls/index.html</guid>
+      <description>压测 200 次一个 429 都没有，后端挂掉后 8 次请求照样 502。两个问题都不是代码写错，而是漏了一层结构性的东西。</description>
+    </item>    <item>
+      <title>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</title>
+      <link>https://cixuy.github.io/posts/mcp-java-sdk-jackson-conflict/index.html</link>
+      <guid>https://cixuy.github.io/posts/mcp-java-sdk-jackson-conflict/index.html</guid>
+      <description>编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</description>
+    </item>    <item>
       <title>MySQL 分表后的分页与聚合：跨表查询的三种处理方式</title>
       <link>https://cixuy.github.io/posts/mysql-sharding-pagination/index.html</link>
       <guid>https://cixuy.github.io/posts/mysql-sharding-pagination/index.html</guid>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 16 日</span>
+        <span>更新 2026 年 11 月 16 日</span>
+        <span>约 2 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#ai-agent-实践">系列 · AI Agent 实践（1 篇）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#mcp">MCP</a><a class="tag" href="../../tags/index.html#java">Java</a><a class="tag" href="../../tags/index.html#jackson">Jackson</a><a class="tag" href="../../tags/index.html#spring-boot">Spring Boot</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>给代码评审服务加 MCP 支持，让外部 AI 客户端能把"评审代码"当成一个工具调用。用的是官方 Java SDK，<code>io.modelcontextprotocol.sdk:mcp:1.1.5</code>，加一行依赖就完事。</p>
+<p>结果：编译通过，<code>mvn package</code> 成功，服务正常启动，SSE 端点连上也能收到 <code>endpoint</code> 事件。<strong>但第一个 <code>initialize</code> 请求打进来，直接 500。</strong></p>
+<h2>现象</h2>
+<pre><code class="language-text">POST /mcp/message -&gt; HTTP 500
+Servlet.service() for servlet [mcp-sse-transport] threw exception
+</code></pre>
+<p>日志往下翻，两行异常，都在 <code>Caused by</code> 里：</p>
+<pre><code class="language-text">java.lang.NoSuchFieldError: POJO
+java.lang.NoSuchMethodError: 'com.fasterxml.jackson.annotation.OptBoolean
+    com.fasterxml.jackson.annotation.JsonProperty.isRequired()'
+</code></pre>
+<p><code>NoSuchFieldError</code> 和 <code>NoSuchMethodError</code> 这两个异常很特殊——它们不是"找不到类"，而是<strong>类找到了、方法签名对不上</strong>。典型的运行时版本冲突。</p>
+<h2>排查</h2>
+<p>先确认 SDK 到底依赖了什么：</p>
+<pre><code class="language-bash">mvn dependency:tree -Dincludes=com.fasterxml.jackson.core
+</code></pre>
+<p>输出里同时出现了两个 Jackson：</p>
+<pre><code class="language-text">com.fasterxml.jackson.core:jackson-annotations:2.15.4
+tools.jackson.core:jackson-annotations:3.0.3
+</code></pre>
+<p>注意 <code>tools.jackson</code> 这个包名——<strong>Jackson 3 换了 groupId 和包名</strong>，从 <code>com.fasterxml.jackson</code> 变成了 <code>tools.jackson</code>。两套注解类名一模一样（都有 <code>@JsonProperty</code>），但字节码不兼容。</p>
+<p>Spring Boot 3.2 用的是 Jackson 2，而 MCP SDK 的默认适配器 <code>mcp-json-jackson3</code> 绑的是 Jackson 3。<code>JsonProperty.isRequired()</code> 这个方法在 Jackson 2 的注解里根本不存在，运行时一反射就炸。</p>
+<p>编译期完全看不出来，因为 SDK 自己的代码是按 Jackson 3 编译的，我只调 <code>McpServer.builder()</code> 这些 API，不直接碰注解。</p>
+<h2>解法</h2>
+<p>SDK 的 JSON 层是插件化的，<code>mcp-json-jackson3</code> 和 <code>mcp-json-jackson2</code> 是两个可互换的实现。把聚合包换成 core + jackson2 适配器：</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+    &lt;groupId&gt;io.modelcontextprotocol.sdk&lt;/groupId&gt;
+    &lt;artifactId&gt;mcp-core&lt;/artifactId&gt;
+    &lt;version&gt;1.1.5&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;io.modelcontextprotocol.sdk&lt;/groupId&gt;
+    &lt;artifactId&gt;mcp-json-jackson2&lt;/artifactId&gt;
+    &lt;version&gt;1.1.5&lt;/version&gt;
+&lt;/dependency&gt;
+</code></pre>
+<p>代码里对应的实现类也换一个包：</p>
+<pre><code class="language-java">// 之前：绑定 Jackson 3
+// import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
+// return new JacksonMcpJsonMapper(JsonMapper.builder().build());
+
+// 之后：绑定已有的 Jackson 2
+import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
+
+@Bean
+public McpJsonMapper mcpJsonMapper() {
+    return new JacksonMcpJsonMapper(new ObjectMapper());
+}
+</code></pre>
+<p>重新打包启动，<code>initialize</code> 返回正常，<code>tools/list</code> 列出三个工具。</p>
+<h2>为什么这个坑值得记</h2>
+<p><strong>第一，<code>NoSuchFieldError</code> / <code>NoSuchMethodError</code> 要优先怀疑依赖冲突，不是代码写错。</strong> 这类异常的堆栈通常指向调用方，但根因在 classpath。看到它们先跑 <code>dependency:tree</code>。</p>
+<p><strong>第二，同一个库的大版本可能换包名。</strong> Jackson 2 到 3 换了 groupId 和根包名，这让"两个版本共存"变得很隐蔽——Maven 不会把它们当成同一个 artifact 的冲突，两个都能装上，编译期也不报错。</p>
+<p><strong>第三</strong>，接入带 JSON 序列化的 SDK 时，<strong>先看它的 JSON 层绑的是哪个序列化库</strong>。MCP SDK 这种设计是合理的（不强制用户用某个 JSON 库），但默认值不一定匹配你的框架版本。</p>
+<hr />
+<p>顺带记一下：换依赖的时候 <code>mvn package</code> 会报 <code>Unable to rename ... .jar to ... .jar.original</code>。这不是配置问题，是<strong>上一次启动的服务还占着那个 jar</strong>。Windows 上文件锁是硬的，<code>taskkill</code> 掉进程再打包就行。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/mysql-sharding-pagination/index.html">← MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">下一篇：自己写网关踩的两个坑：限流没生效，熔断不触发 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

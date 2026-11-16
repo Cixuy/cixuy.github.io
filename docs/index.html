@@ -47,8 +47,29 @@
     </div>
   </section>
   <section>
-    <p class="section-label">文章 · 5 篇</p>
+    <p class="section-label">文章 · 8 篇</p>
 <ul class="post-list">
+    <li class="post-item">
+      <time datetime="2026-11-16">2026 年 11 月 16 日</time>
+      <h2><a href="posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a></h2>
+      <p>健康检查接口不报错、不超时、也不返回数据，就是没反应。根因是一个循环里的 return 跳过了后面的发送逻辑。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#c">C++</a><a class="tag" href="tags/index.html#epoll">epoll</a><a class="tag" href="tags/index.html#reactor">Reactor</a><a class="tag" href="tags/index.html#http">HTTP</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-16">2026 年 11 月 16 日</time>
+      <h2><a href="posts/gateway-limiter-breaker-pitfalls/index.html">自己写网关踩的两个坑：限流没生效，熔断不触发</a></h2>
+      <p>压测 200 次一个 429 都没有，后端挂掉后 8 次请求照样 502。两个问题都不是代码写错，而是漏了一层结构性的东西。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#go">Go</a><a class="tag" href="tags/index.html#网关">网关</a><a class="tag" href="tags/index.html#限流">限流</a><a class="tag" href="tags/index.html#熔断">熔断</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-16">2026 年 11 月 16 日</time>
+      <h2><a href="posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></h2>
+      <p>编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#mcp">MCP</a><a class="tag" href="tags/index.html#java">Java</a><a class="tag" href="tags/index.html#jackson">Jackson</a><a class="tag" href="tags/index.html#spring-boot">Spring Boot</a></div>
+    </li>
     <li class="post-item">
       <time datetime="2026-11-16">2026 年 11 月 16 日</time>
       <h2><a href="posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a></h2>

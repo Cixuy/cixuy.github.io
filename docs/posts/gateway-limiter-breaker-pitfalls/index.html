@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自己写网关踩的两个坑：限流没生效，熔断不触发 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="自己写网关踩的两个坑：限流没生效，熔断不触发 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">系列</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>自己写网关踩的两个坑：限流没生效，熔断不触发</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 16 日</span>
+        <span>更新 2026 年 11 月 16 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/index.html#go-服务端">系列 · Go 服务端（1 篇）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#go">Go</a><a class="tag" href="../../tags/index.html#网关">网关</a><a class="tag" href="../../tags/index.html#限流">限流</a><a class="tag" href="../../tags/index.html#熔断">熔断</a></span>
+      </div>
+    </header>
+    <div class="prose">
+<p>用 Go 写了个网关，限流用令牌桶，熔断用三态机。代码编译一次过，单元测试也懒得写就跑去验证——结果两个功能全哑了。</p>
+<p>排查过程和根因都挺典型，记一下。</p>
+<h2>坑一：限流完全不生效</h2>
+<p>配置里写的是 50 rps、burst 100。验证方式很朴素，连发 200 次健康检查：</p>
+<pre><code class="language-bash">for i in $(seq 1 200); do
+  curl -s -o /dev/null -w &quot;%{http_code}\n&quot; http://localhost:9000/health
+done | sort | uniq -c
+</code></pre>
+<p>期望看到一批 429，实际是：</p>
+<pre><code class="language-text">    200 200
+</code></pre>
+<p>全部 200，一个限流都没有。第一反应是令牌桶算错了，但重读代码没问题——<code>rate.NewLimiter(50, 100)</code> 加 <code>Allow()</code>，标准用法。</p>
+<p>问题在别处。启动代码长这样：</p>
+<pre><code class="language-go">mux := http.NewServeMux()
+mux.Handle(&quot;/health&quot;, healthHandler)     // 直接注册
+mux.Handle(&quot;/metrics&quot;, metrics.Handler()) // 直接注册
+mux.Handle(&quot;/&quot;, chain(router, ...))       // 这里才套中间件
+</code></pre>
+<p><strong>中间件只包住了 <code>mux</code> 的 <code>/</code> 分支，<code>/health</code> 走的是另一个独立分支，压根没经过限流。</strong></p>
+<p>这也解释了为什么日志里也看不到健康检查的访问记录——它连日志中间件都绕过了。</p>
+<p>改法是把健康检查从 mux 里拿掉，放进路由分发函数：</p>
+<pre><code class="language-go">func dispatch(w http.ResponseWriter, r *http.Request) {
+    if r.URL.Path == &quot;/health&quot; {
+        w.Write([]byte(`{&quot;status&quot;:&quot;ok&quot;}`))
+        return
+    }
+    // 走路由匹配和代理...
+}
+
+mux := http.NewServeMux()
+mux.Handle(&quot;/metrics&quot;, metrics.Handler())  // 唯一豁免
+mux.Handle(&quot;/&quot;, chain(http.HandlerFunc(dispatch), logging, metricsMW, limiter, auth))
+</code></pre>
+<p><code>/metrics</code> 是刻意豁免的——它必须绕过限流，否则 Prometheus 抓取会被自己限掉，监控直接瞎掉。</p>
+<p>改完再压，结果正常了：</p>
+<pre><code class="language-text">200: 106
+429: 294
+</code></pre>
+<p>106 大约是 burst 100 加上限流期间补充的几个令牌。</p>
+<p><strong>教训</strong>：<code>ServeMux</code> 上注册的每一条独立路径都是中间件的保护缺口。注册的路径越多，漏得越多。正确的结构是<strong>只留一个入口，其余全部在链内部按路径分发</strong>。</p>
+<h2>坑二：熔断器永远不打开</h2>
+<p>熔断的逻辑是"连续失败 5 次后打开，打开期间直接返回 503"。验证方法是把后端停掉，然后连续请求。</p>
+<p>结果 8 次请求全部是 502：</p>
+<pre><code class="language-text">第 1 次: 502
+...
+第 8 次: 502
+</code></pre>
+<p>502 是反向代理连不上后端时的默认错误，说明请求确实到了代理层。但熔断器的状态指标一直是 0（关闭）：</p>
+<pre><code class="language-text">gateway_breaker_state{route=&quot;/review&quot;} 0
+</code></pre>
+<p>原因很直白：<code>Guard</code> 只做了"放行判断"，没有做"结果记账"。</p>
+<pre><code class="language-go">// 修改前
+func (b *Breaker) Guard(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if !b.Allow() {          // 打开就拒绝
+            w.WriteHeader(503)
+            return
+        }
+        next.ServeHTTP(w, r)     // 放行，但结果没人看
+    })
+}
+</code></pre>
+<p><code>Allow()</code> 在关闭状态下永远返回 true，<code>Failure()</code> 一次都没被调用，计数器停在 0，阈值永远不会到达。</p>
+<p>修法是包一层状态记录器，请求结束后看响应码：</p>
+<pre><code class="language-go">func (b *Breaker) Guard(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if !b.Allow() {
+            http.Error(w, &quot;upstream unavailable&quot;, 503)
+            return
+        }
+        sw := NewStatusWriter(w)
+        next.ServeHTTP(sw, r)
+        if sw.Status &gt;= 500 {
+            b.Failure()
+        } else {
+            b.Success()
+        }
+    })
+}
+</code></pre>
+<p>改完立刻正常：</p>
+<pre><code class="language-text">第 1-5 次: 502     ← 真实调用，累计失败
+第 6-8 次: 503     ← 熔断打开，不再打后端
+</code></pre>
+<p>后端恢复后请求回到 200，熔断自动关闭。</p>
+<p><strong>教训</strong>：熔断器不是"拦截器"，是"带状态的观测器"。它必须同时具备三个入口——<strong>放行判断、成功上报、失败上报</strong>。只实现第一个，就只是一个会无条件放行的装饰器。</p>
+<h2>两个坑的共同点</h2>
+<p>都不是"代码写错了"，而是<strong>结构上少了一层</strong>：</p>
+<ul>
+<li>限流少的是"所有路径都经过中间件"这个约束</li>
+<li>熔断少的是"结果回传给状态机"这条回路</li>
+</ul>
+<p>这类问题编译期、甚至类型检查都发现不了，只有真的跑一次、真的看一眼计数，才会暴露。写完一个中间件就立刻验证一次，比攒到最后一起测要省事得多。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">← 接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <a href="../../posts/cpp-reactor-return-vs-break/index.html">下一篇：Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
