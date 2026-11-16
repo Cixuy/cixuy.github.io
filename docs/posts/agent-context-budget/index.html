@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>上下文窗口不是无限口袋：8000 字符预算怎么切 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="上下文窗口不是无限口袋：8000 字符预算怎么切 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>上下文窗口不是无限口袋：8000 字符预算怎么切</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 8 日</span>
+        <span>更新 2026 年 11 月 8 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#ai-agent">AI Agent</a><a class="tag" href="../../tags/index.html#上下文">上下文</a><a class="tag" href="../../tags/index.html#rag">RAG</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 3 / 6 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li class="cur"><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>第一次跑评审，我把整个文件贴进 prompt 里。两百多行的 Java 文件，加上规则说明和输出格式要求，总共一万多字，模型跑得动，结论也对。</p>
+<p>换成真实项目里的八百行文件，问题全出来了：前面说的"只报严重级别 error"被忽略，输出格式从 JSON 变成了解释性段落，还有几处引用了文件里根本不存在的行号。</p>
+<p>不是模型变笨了，是上下文被撑满之后的必然结果：<strong>模型对 prompt 里越靠前、越结构化的内容注意力越强，塞到后面就被稀释了。</strong></p>
+<h2>先把预算说清楚</h2>
+<p>我把一次请求的上下文预算定在 8000 字符，切分单位 800 字符。这两个数的来历：</p>
+<ul>
+<li><strong>8000</strong>：模型能给到的稳定注意力区间远大于这个数，但我要留出空间给工具返回、历史轮次和系统提示。实测超过 8000 之后，指令遵循开始不稳定</li>
+<li><strong>800</strong>：一段 800 字符的代码大约 20-30 行，通常是一个完整方法。再大就会出现"一个片段里两件事"，检索和引用都变糊</li>
+</ul>
+<p>这两个数不是调优出来的最优解，是"能稳定跑住"的起点。第三章末尾我会说为什么后来把它们做成可配置的。</p>
+<h2>切分不能按字数硬切</h2>
+<p>按 800 字硬切最省事，也最坑：切点落在方法中间，模型看到半截 <code>if</code>，会自己补一个不存在的 <code>}</code> 然后开始瞎解释。</p>
+<p>我的切分顺序是：</p>
+<ol>
+<li>按空行切块，尽量保持方法/类的边界</li>
+<li>单块超过 800 就往下找最近的 <code>}</code> 或空行断点</li>
+<li>相邻块之间保留 1 行重叠，避免边界处语义断裂</li>
+<li>每块记录起止行号</li>
+</ol>
+<p>第 4 条是为了引用。模型说"第 12 行有问题"时，我得能验证这个行号确实在送进去的片段里，否则就是幻觉。</p>
+<h2>预算超了砍谁</h2>
+<p>一个八百行的文件切完是二十多块，全塞就是一万六千字，超一倍。必须选。</p>
+<p>我的优先级：</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>内容</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>变更的文件（diff 部分）</td>
+<td>评审的重点就是这次改了什么</td>
+</tr>
+<tr>
+<td>2</td>
+<td>被调用方签名</td>
+<td>判断参数合法性必须看</td>
+</tr>
+<tr>
+<td>3</td>
+<td>同文件相关片段</td>
+<td>上下文连贯性</td>
+</tr>
+<tr>
+<td>4</td>
+<td>历史问题召回</td>
+<td>有证据价值但可省</td>
+</tr>
+<tr>
+<td>5</td>
+<td>整个文件的其他片段</td>
+<td>最后才考虑</td>
+</tr>
+</tbody>
+</table>
+<p>一开始我把整个文件排在第 2 位，觉得"看得全才准"，结果每次都把预算吃光，历史召回一条都塞不进去，模型也就永远说不出"这个问题历史上出现过"。</p>
+<p>改成按 diff 优先之后，同样的预算下结论质量明显更好——因为模型看到的是"改动 + 相关上下文"，而不是"一个完整但无关的巨文件"。</p>
+<h2>砍掉的部分要告诉模型</h2>
+<p>这是最容易漏的一步。预算不够只送了 60% 的代码，如果不说明，模型会默认自己看到了全部，然后断言"这个类没有其他调用方"。</p>
+<p>所以每次裁剪完，我在系统提示里追加一段：</p>
+<pre><code class="language-text">[上下文说明]
+本次只提供了 12/21 个代码片段（按 diff 与调用关系优先）。
+未提供的部分可能包含其他调用点，涉及&quot;是否全部覆盖&quot;的结论时请说明依据。
+</code></pre>
+<p>加了这段之后，模型开始主动说"仅基于提供的片段"，而不是给绝对结论。评审工具最怕的就是这种过度自信。</p>
+<h2>工具返回也要算预算</h2>
+<p>这点我前面提过，这里补一个数字：一次 <code>search_similar</code> 召回 8 段、每段 1000 字，就是 8000 字符——一次性把整轮预算吃光，后面所有工具调用都塞不进去。</p>
+<p>现在的返回格式是每段 200 字 + 相似度 + 片段 ID，8 段总共 1600 字符左右，占预算 20%。想看全文再用 ID 单独取。</p>
+<p>原则很简单：<strong>工具返回给的是索引，不是全文。</strong> 让模型自己决定展开哪个。</p>
+<h2>反思</h2>
+<p>做完这一章我才意识到，上下文预算不是一个"技术参数"，而是一个产品决策：你决定让模型优先看到什么，就等于决定了它能得出什么结论。</p>
+<p>后来我把 800 / 8000 都提成了配置项（一开始是硬编码），因为不同项目差别很大：三千行的老项目需要更激进的裁剪，几百行的小工具反而可以给全。下一章写另一件事——怎么让 Agent 记住这些偏好，而不是每次都重新告诉它。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/mcp-java-sdk-jackson-conflict/index.html"><span>上一章</span>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a><a class="ch-next" href="../../posts/agent-memory-layers/index.html"><span>下一章</span>让 Agent 记住这个项目：记忆分三层，别混成一层</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">← 接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">下一篇：MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

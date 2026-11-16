@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 14 日</span>
         <span>更新 2026 年 11 月 14 日</span>
         <span>约 3 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#websocket-实时通信">系列 · WebSocket 实时通信（1 篇）</a>
+        <a class="tag tag-series" href="../../series/websocket-实时通信/index.html">专栏 · WebSocket 实时通信（1 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#websocket">WebSocket</a><a class="tag" href="../../tags/index.html#nginx">Nginx</a><a class="tag" href="../../tags/index.html#部署">部署</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/websocket-实时通信/index.html">WebSocket 实时通信</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></li></ol>
+    </nav>
     <div class="prose">
 <p>智慧工地那个项目里，大屏需要实时显示塔吊的运行参数和告警截图，我把 HTTP 轮询换成了 WebSocket。本地开发一切正常，部署到测试服务器（前面挂 Nginx 做反向代理）之后，连接表现得很奇怪：有时候握手直接 400，有时候连上了但一分钟左右就断，前端只能靠重连硬扛。</p>
 <p>后来把这三个坑一个个挖出来，记录一下。</p>
@@ -106,7 +111,7 @@ const socket = new WebSocket(proto + location.host + '/ws');
 <p>这套配置现在跑在我自己的服务器上，坑是踩过了，但换个环境（比如上云之后前面多一层 SLB）大概还会遇到新问题。到时候再补。</p>
     </div>
     <footer class="article-foot">
-      <div><a href="../../posts/redis-logical-expire/index.html">← 缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a> <a href="../../posts/threadlocal-context-leak/index.html">下一篇：ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用 →</a></div>
+      <div><a href="../../posts/agent-memory-layers/index.html">← 让 Agent 记住这个项目：记忆分三层，别混成一层</a> <a href="../../posts/agent-tool-degradation/index.html">下一篇：工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

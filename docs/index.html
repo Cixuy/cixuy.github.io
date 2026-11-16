@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="index.html">文章</a>
       <a href="tags/index.html">标签</a>
-      <a href="series/index.html">系列</a>
+      <a href="series/index.html">专栏</a>
       <a href="about/index.html">关于</a>
       <a href="feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -47,8 +47,15 @@
     </div>
   </section>
   <section>
-    <p class="section-label">文章 · 8 篇</p>
+    <p class="section-label">文章 · 13 篇</p>
 <ul class="post-list">
+    <li class="post-item">
+      <time datetime="2026-11-16">2026 年 11 月 16 日</time>
+      <h2><a href="posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></h2>
+      <p>调切片大小、改合并策略、加一条记忆规则，每次改完都觉得&quot;看起来更好了&quot;。这一章写我怎么用一套固定用例把这种错觉压下去，以及评测集到底该长什么样。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#ai-agent">AI Agent</a><a class="tag" href="tags/index.html#评测">评测</a><a class="tag" href="tags/index.html#回归">回归</a></div>
+    </li>
     <li class="post-item">
       <time datetime="2026-11-16">2026 年 11 月 16 日</time>
       <h2><a href="posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a></h2>
@@ -62,13 +69,6 @@
       <p>压测 200 次一个 429 都没有，后端挂掉后 8 次请求照样 502。两个问题都不是代码写错，而是漏了一层结构性的东西。</p>
       
       <div class="tags"><a class="tag" href="tags/index.html#go">Go</a><a class="tag" href="tags/index.html#网关">网关</a><a class="tag" href="tags/index.html#限流">限流</a><a class="tag" href="tags/index.html#熔断">熔断</a></div>
-    </li>
-    <li class="post-item">
-      <time datetime="2026-11-16">2026 年 11 月 16 日</time>
-      <h2><a href="posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></h2>
-      <p>编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</p>
-      
-      <div class="tags"><a class="tag" href="tags/index.html#mcp">MCP</a><a class="tag" href="tags/index.html#java">Java</a><a class="tag" href="tags/index.html#jackson">Jackson</a><a class="tag" href="tags/index.html#spring-boot">Spring Boot</a></div>
     </li>
     <li class="post-item">
       <time datetime="2026-11-16">2026 年 11 月 16 日</time>
@@ -86,10 +86,24 @@
     </li>
     <li class="post-item">
       <time datetime="2026-11-14">2026 年 11 月 14 日</time>
+      <h2><a href="posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></h2>
+      <p>评审 Agent 背后有两个引擎：C++ 静态分析服务和 Java 规则引擎。它们会超时、会给出重复结论、会互相矛盾。这一章写合并规则和三层降级，以及为什么错误信息也要写成给模型看的样子。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#ai-agent">AI Agent</a><a class="tag" href="tags/index.html#容错">容错</a><a class="tag" href="tags/index.html#降级">降级</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-14">2026 年 11 月 14 日</time>
       <h2><a href="posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></h2>
       <p>本地正常、上线就失败的典型场景：握手 400、连上 60 秒断、https 下直接连不上。逐条给出原因、配置和排查顺序。</p>
       
       <div class="tags"><a class="tag" href="tags/index.html#websocket">WebSocket</a><a class="tag" href="tags/index.html#nginx">Nginx</a><a class="tag" href="tags/index.html#部署">部署</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-12">2026 年 11 月 12 日</time>
+      <h2><a href="posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></h2>
+      <p>会话记忆、项目记忆、检索出来的证据，这三样东西混在一起是灾难。这一章写我怎么把&quot;记住&quot;拆开存、怎么决定什么时候写回去，以及过期规则怎么清。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#ai-agent">AI Agent</a><a class="tag" href="tags/index.html#记忆">记忆</a><a class="tag" href="tags/index.html#rag">RAG</a></div>
     </li>
     <li class="post-item">
       <time datetime="2026-11-12">2026 年 11 月 12 日</time>
@@ -104,6 +118,27 @@
       <p>从单表膨胀的算账过程讲起，对比两种存储的适用边界，再记录 tag/field 设计、窗口聚合、数据过期这三处实际踩过的坑。</p>
       <div class="post-meta">更新于 2026 年 11 月 14 日</div>
       <div class="tags"><a class="tag" href="tags/index.html#influxdb">InfluxDB</a><a class="tag" href="tags/index.html#mysql">MySQL</a><a class="tag" href="tags/index.html#选型">选型</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-08">2026 年 11 月 8 日</time>
+      <h2><a href="posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></h2>
+      <p>一个代码文件几千行，全塞进去模型就开始丢指令；塞太少又看不出跨文件关系。这一章写我怎么定 800 / 8000 这两个数，以及预算超了之后先砍谁。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#ai-agent">AI Agent</a><a class="tag" href="tags/index.html#上下文">上下文</a><a class="tag" href="tags/index.html#rag">RAG</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-06">2026 年 11 月 6 日</time>
+      <h2><a href="posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></h2>
+      <p>编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#mcp">MCP</a><a class="tag" href="tags/index.html#java">Java</a><a class="tag" href="tags/index.html#jackson">Jackson</a><a class="tag" href="tags/index.html#spring-boot">Spring Boot</a></div>
+    </li>
+    <li class="post-item">
+      <time datetime="2026-11-04">2026 年 11 月 4 日</time>
+      <h2><a href="posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></h2>
+      <p>把 Agent 拆开看，它只是一段 while 循环：问模型、执行它点名的工具、把结果塞回去、再问。这一章写清楚这个循环的最小实现，以及我第一版漏掉的四个细节。</p>
+      
+      <div class="tags"><a class="tag" href="tags/index.html#ai-agent">AI Agent</a><a class="tag" href="tags/index.html#工具调用">工具调用</a><a class="tag" href="tags/index.html#mcp">MCP</a></div>
     </li>
     </ul>
   </section>

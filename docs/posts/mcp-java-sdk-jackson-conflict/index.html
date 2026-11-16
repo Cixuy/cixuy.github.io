@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -40,13 +40,18 @@
     <header class="article-head">
       <h1>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</h1>
       <div class="meta-line">
-        <span>创建 2026 年 11 月 16 日</span>
-        <span>更新 2026 年 11 月 16 日</span>
+        <span>创建 2026 年 11 月 6 日</span>
+        <span>更新 2026 年 11 月 6 日</span>
         <span>约 2 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#ai-agent-实践">系列 · AI Agent 实践（1 篇）</a>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#mcp">MCP</a><a class="tag" href="../../tags/index.html#java">Java</a><a class="tag" href="../../tags/index.html#jackson">Jackson</a><a class="tag" href="../../tags/index.html#spring-boot">Spring Boot</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 2 / 6 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li class="cur"><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
     <div class="prose">
 <p>给代码评审服务加 MCP 支持，让外部 AI 客户端能把"评审代码"当成一个工具调用。用的是官方 Java SDK，<code>io.modelcontextprotocol.sdk:mcp:1.1.5</code>，加一行依赖就完事。</p>
 <p>结果：编译通过，<code>mvn package</code> 成功，服务正常启动，SSE 端点连上也能收到 <code>endpoint</code> 事件。<strong>但第一个 <code>initialize</code> 请求打进来，直接 500。</strong></p>
@@ -105,8 +110,9 @@ public McpJsonMapper mcpJsonMapper() {
 <hr />
 <p>顺带记一下：换依赖的时候 <code>mvn package</code> 会报 <code>Unable to rename ... .jar to ... .jar.original</code>。这不是配置问题，是<strong>上一次启动的服务还占着那个 jar</strong>。Windows 上文件锁是硬的，<code>taskkill</code> 掉进程再打包就行。</p>
     </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/agent-tool-loop/index.html"><span>上一章</span>先别急着上框架：一次工具调用循环到底长什么样</a><a class="ch-next" href="../../posts/agent-context-budget/index.html"><span>下一章</span>上下文窗口不是无限口袋：8000 字符预算怎么切</a></div>
     <footer class="article-foot">
-      <div><a href="../../posts/mysql-sharding-pagination/index.html">← MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">下一篇：自己写网关踩的两个坑：限流没生效，熔断不触发 →</a></div>
+      <div><a href="../../posts/agent-tool-loop/index.html">← 先别急着上框架：一次工具调用循环到底长什么样</a> <a href="../../posts/agent-context-budget/index.html">下一篇：上下文窗口不是无限口袋：8000 字符预算怎么切 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

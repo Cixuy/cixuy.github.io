@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 9 日</span>
         <span>更新 2026 年 11 月 14 日</span>
         <span>约 4 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#存储选型">系列 · 存储选型（2 篇）</a>
+        <a class="tag tag-series" href="../../series/存储选型/index.html">专栏 · 存储选型（2 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#influxdb">InfluxDB</a><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#选型">选型</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/存储选型/index.html">存储选型</a>
+        <span>第 1 / 2 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a></li><li><span class="ch-num">02</span><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a></li></ol>
+    </nav>
     <div class="prose">
 <p>ServerOps 这个运维系统最初是"一套 MySQL 打天下"：服务器、告警、规则、指标，全塞进关系库。前两周跑得很好，问题是在第三个月暴露的。</p>
 <h2>MySQL 是什么时候开始撑不住的</h2>
@@ -140,8 +145,9 @@ influx bucket create -n metrics -r 720h
 <hr />
 <p>数据量那块我按 50 台机器估算的，机器数再往上翻，写入侧的压力会比线性增长更明显。如果你也在做类似的系统，先把自己的量级算清楚再选，别照着别人的架构抄。</p>
     </div>
+    <div class="chapter-nav"><a class="ch-next" href="../../posts/mysql-sharding-pagination/index.html"><span>下一章</span>MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a></div>
     <footer class="article-foot">
-      <div><a href="../../posts/redis-logical-expire/index.html">下一篇：缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 →</a></div>
+      <div><a href="../../posts/agent-context-budget/index.html">← 上下文窗口不是无限口袋：8000 字符预算怎么切</a> <a href="../../posts/redis-logical-expire/index.html">下一篇：缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

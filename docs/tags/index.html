@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -37,13 +37,25 @@
 </header>
 <main class="wrap">
   <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">标签</h1></section>
+    <section id="ai-agent" style="margin-bottom:36px">
+      <p class="section-label">AI Agent · 5 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li><li><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 14 日</span></li><li><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 12 日</span></li><li><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 8 日</span></li><li><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 4 日</span></li></ul>
+    </section>
     <section id="java" style="margin-bottom:36px">
       <p class="section-label">Java · 2 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li><li><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 15 日</span></li></ul>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 15 日</span></li><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 6 日</span></li></ul>
+    </section>
+    <section id="mcp" style="margin-bottom:36px">
+      <p class="section-label">MCP · 2 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 6 日</span></li><li><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 4 日</span></li></ul>
     </section>
     <section id="mysql" style="margin-bottom:36px">
       <p class="section-label">MySQL · 2 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li><li><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 9 日</span></li></ul>
+    </section>
+    <section id="rag" style="margin-bottom:36px">
+      <p class="section-label">RAG · 2 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 12 日</span></li><li><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 8 日</span></li></ul>
     </section>
     <section id="并发" style="margin-bottom:36px">
       <p class="section-label">并发 · 2 篇</p>
@@ -67,11 +79,7 @@
     </section>
     <section id="jackson" style="margin-bottom:36px">
       <p class="section-label">Jackson · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
-    </section>
-    <section id="mcp" style="margin-bottom:36px">
-      <p class="section-label">MCP · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 6 日</span></li></ul>
     </section>
     <section id="nginx" style="margin-bottom:36px">
       <p class="section-label">Nginx · 1 篇</p>
@@ -87,7 +95,7 @@
     </section>
     <section id="spring-boot" style="margin-bottom:36px">
       <p class="section-label">Spring Boot · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 6 日</span></li></ul>
     </section>
     <section id="threadlocal" style="margin-bottom:36px">
       <p class="section-label">ThreadLocal · 1 篇</p>
@@ -101,6 +109,10 @@
       <p class="section-label">epoll · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
     </section>
+    <section id="上下文" style="margin-bottom:36px">
+      <p class="section-label">上下文 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 8 日</span></li></ul>
+    </section>
     <section id="分表" style="margin-bottom:36px">
       <p class="section-label">分表 · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
@@ -108,6 +120,18 @@
     <section id="分页" style="margin-bottom:36px">
       <p class="section-label">分页 · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    </section>
+    <section id="回归" style="margin-bottom:36px">
+      <p class="section-label">回归 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    </section>
+    <section id="容错" style="margin-bottom:36px">
+      <p class="section-label">容错 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 14 日</span></li></ul>
+    </section>
+    <section id="工具调用" style="margin-bottom:36px">
+      <p class="section-label">工具调用 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 4 日</span></li></ul>
     </section>
     <section id="熔断" style="margin-bottom:36px">
       <p class="section-label">熔断 · 1 篇</p>
@@ -121,6 +145,14 @@
       <p class="section-label">网关 · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">自己写网关踩的两个坑：限流没生效，熔断不触发</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
     </section>
+    <section id="记忆" style="margin-bottom:36px">
+      <p class="section-label">记忆 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 12 日</span></li></ul>
+    </section>
+    <section id="评测" style="margin-bottom:36px">
+      <p class="section-label">评测 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    </section>
     <section id="选型" style="margin-bottom:36px">
       <p class="section-label">选型 · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 9 日</span></li></ul>
@@ -128,6 +160,10 @@
     <section id="部署" style="margin-bottom:36px">
       <p class="section-label">部署 · 1 篇</p>
       <ul class="prose" style="font-size:15px"><li><a href="../../posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 14 日</span></li></ul>
+    </section>
+    <section id="降级" style="margin-bottom:36px">
+      <p class="section-label">降级 · 1 篇</p>
+      <ul class="prose" style="font-size:15px"><li><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 14 日</span></li></ul>
     </section>
     <section id="限流" style="margin-bottom:36px">
       <p class="section-label">限流 · 1 篇</p>

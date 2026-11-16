@@ -117,7 +117,7 @@ def page(title, body, prefix="", extra_head=""):
     <nav class="nav">
       <a href="{prefix}index.html">文章</a>
       <a href="{prefix}tags/index.html">标签</a>
-      <a href="{prefix}series/index.html">系列</a>
+      <a href="{prefix}series/index.html">专栏</a>
       <a href="{prefix}about/index.html">关于</a>
       <a href="{prefix}feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -141,6 +141,23 @@ def page(title, body, prefix="", extra_head=""):
 
 def post_url(p):
     return f"posts/{p['slug']}/index.html"
+
+
+def series_slug(name):
+    return slugify_tag(name)
+
+
+def series_chapters(posts, name):
+    """同一专栏的章节，先按 chapter 序号，没写序号的按日期排到最后"""
+    same = [p for p in posts if p["series"] == name]
+    return sorted(same, key=lambda x: (x["chapter"] or 999, x["date"]))
+
+
+def series_desc(posts, name):
+    for p in series_chapters(posts, name):
+        if p.get("series_desc"):
+            return p["series_desc"]
+    return ""
 
 
 # ---------- 生成 ----------
@@ -167,6 +184,8 @@ def load_posts():
             "date": date,
             "updated": meta.get("updated", "") or date,
             "series": meta.get("series", ""),
+            "chapter": int(meta.get("chapter") or 0),
+            "series_desc": meta.get("series_desc", ""),
             "summary": meta.get("summary", ""),
             "tags": tags,
             "content": content,
@@ -228,12 +247,43 @@ def build_post(p, posts):
         f'<a class="tag" href="../../tags/index.html#{slugify_tag(t)}">{esc(t)}</a>' for t in p["tags"]
     )
     series_html = ""
+    series_box = ""
+    chapter_nav = ""
     if p["series"]:
-        same = [x for x in posts if x["series"] == p["series"]]
+        chapters = series_chapters(posts, p["series"])
+        home = f'../../series/{series_slug(p["series"])}/index.html'
         series_html = (
-            f'<a class="tag tag-series" href="../../series/index.html#{slugify_tag(p["series"])}">'
-            f'系列 · {esc(p["series"])}（{len(same)} 篇）</a>'
+            f'<a class="tag tag-series" href="{home}">'
+            f'专栏 · {esc(p["series"])}（{len(chapters)} 章）</a>'
         )
+
+        # 目录：当前章加粗，未发布的章节不会出现在 posts 里，所以这里永远是真实可点的
+        items = []
+        for c in chapters:
+            cur = ' class="cur"' if c["slug"] == p["slug"] else ""
+            num = f'<span class="ch-num">{c["chapter"] or chapters.index(c) + 1:02d}</span>'
+            items.append(f'<li{cur}>{num}<a href="../../{post_url(c)}">{esc(c["title"])}</a></li>')
+
+        idx_c = chapters.index(p)
+        prev_c = chapters[idx_c - 1] if idx_c > 0 else None
+        next_c = chapters[idx_c + 1] if idx_c + 1 < len(chapters) else None
+        nav = []
+        if prev_c:
+            nav.append(f'<a class="ch-prev" href="../../{post_url(prev_c)}">'
+                       f'<span>上一章</span>{esc(prev_c["title"])}</a>')
+        if next_c:
+            nav.append(f'<a class="ch-next" href="../../{post_url(next_c)}">'
+                       f'<span>下一章</span>{esc(next_c["title"])}</a>')
+
+        series_box = f"""    <nav class="series-box">
+      <p class="series-box-head"><a href="{home}">{esc(p["series"])}</a>
+        <span>第 {idx_c + 1} / {len(chapters)} 章</span></p>
+      <ol class="chapter-list">{"".join(items)}</ol>
+    </nav>"""
+        if nav:
+            chapter_nav = f'    <div class="chapter-nav">{"".join(nav)}</div>\n'
+
+
     body = f"""  <article class="article">
     <header class="article-head">
       <h1>{esc(p['title'])}</h1>
@@ -245,10 +295,11 @@ def build_post(p, posts):
         <span class="tags">{tags_html}</span>
       </div>
     </header>
+{series_box}
     <div class="prose">
 {p['content']}
     </div>
-    <footer class="article-foot">
+{chapter_nav}    <footer class="article-foot">
       <div>{" ".join(links)}</div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
@@ -285,20 +336,66 @@ def build_series(posts):
             groups.setdefault(p["series"], []).append(p)
     if not groups:
         return page("系列", '  <p class="empty">还没有系列。</p>', prefix="../../")
-    blocks = []
+
+    cards = []
     for s in sorted(groups, key=lambda x: (-len(groups[x]), x)):
-        items = sorted(groups[s], key=lambda x: x["date"])
-        lis = "".join(
-            f'<li><a href="../../{post_url(p)}">{esc(p["title"])}</a> '
-            f'<span style="color:var(--faint);font-size:13px">{fmt_date(p["date"])}</span></li>'
-            for p in items
+        chapters = series_chapters(posts, s)
+        desc = series_desc(posts, s)
+        last = chapters[-1]["date"] if chapters else ""
+        items = "".join(
+            f'<li><span class="ch-num">{c["chapter"] or i:02d}</span>'
+            f'<a href="../../{post_url(c)}">{esc(c["title"])}</a></li>'
+            for i, c in enumerate(chapters[:4], 1)
         )
-        blocks.append(f"""    <section id="{slugify_tag(s)}" style="margin-bottom:36px">
-      <p class="section-label">{esc(s)} · {len(items)} 篇</p>
-      <ul class="prose" style="font-size:15px">{lis}</ul>
+        more = f'<p class="col-more">还有 {len(chapters) - 4} 章</p>' if len(chapters) > 4 else ""
+        cards.append(f"""    <section class="column-card" id="{series_slug(s)}">
+      <p class="section-label">专栏 · {len(chapters)} 章{(" · 最近更新 " + fmt_date(last)) if last else ""}</p>
+      <h2><a href="../../series/{series_slug(s)}/index.html">{esc(s)}</a></h2>
+      {f'<p class="col-desc">{esc(desc)}</p>' if desc else ''}
+      <ol class="chapter-list">{items}</ol>
+      {more}
+      <p class="col-enter"><a href="../../series/{series_slug(s)}/index.html">进入专栏 →</a></p>
     </section>""")
-    body = '  <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">系列</h1></section>\n' + "\n".join(blocks)
-    return page("系列", body, prefix="../../")
+
+    body = ('  <section class="hero" style="padding-bottom:16px">'
+            '<h1 style="font-size:24px">专栏</h1>'
+            '<p class="lede">按主题成组写的长系列，一章一个问题，按顺序读。</p></section>\n'
+            + "\n".join(cards))
+    return page("专栏", body, prefix="../../")
+
+
+def build_series_detail(posts, name):
+    chapters = series_chapters(posts, name)
+    desc = series_desc(posts, name)
+    first = chapters[0] if chapters else None
+
+    lis = []
+    for i, c in enumerate(chapters, 1):
+        lis.append(f"""      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">{c["chapter"] or i:02d}</span>
+          <h3><a href="../../{post_url(c)}">{esc(c["title"])}</a></h3>
+          <span class="col-date">{fmt_date(c["date"])}</span>
+        </div>
+        <p class="col-sum">{esc(c["summary"])}</p>
+        <p class="col-meta">约 {c["minutes"]} 分钟</p>
+      </li>""")
+
+    body = f"""  <article class="article column">
+    <header class="article-head">
+      <p class="section-label">专栏 · {len(chapters)} 章</p>
+      <h1>{esc(name)}</h1>
+      {f'<p class="lede">{esc(desc)}</p>' if desc else ''}
+      {f'<p class="col-start"><a href="../../{post_url(first)}">从第一章开始读 →</a></p>' if first else ''}
+    </header>
+    <ol class="col-list">
+{"".join(lis)}
+    </ol>
+    <footer class="article-foot">
+      <div><a href="../../series/index.html">所有专栏</a></div>
+    </footer>
+  </article>"""
+    return page(name, body, prefix="../../")
 
 
 def build_page(md_file):
@@ -382,6 +479,19 @@ def main():
 
     (OUT / "series").mkdir(exist_ok=True)
     (OUT / "series" / "index.html").write_text(build_series(posts), encoding="utf-8")
+
+    # 每个专栏一个独立页面；顺手清掉已经改了名字的旧专栏目录
+    names = {p["series"] for p in posts if p["series"]}
+    for name in names:
+        d = OUT / "series" / series_slug(name)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "index.html").write_text(build_series_detail(posts, name), encoding="utf-8")
+    for d in (OUT / "series").iterdir():
+        if d.is_dir() and d.name not in {series_slug(n) for n in names}:
+            try:
+                shutil.rmtree(d)
+            except OSError:
+                pass
 
     if PAGES_DIR.exists():
         for f in PAGES_DIR.glob("*.md"):

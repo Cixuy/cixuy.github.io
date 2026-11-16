@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 12 日</span>
         <span>更新 2026 年 11 月 14 日</span>
         <span>约 4 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#缓存与并发">系列 · 缓存与并发（2 篇）</a>
+        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（2 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#缓存">缓存</a><a class="tag" href="../../tags/index.html#并发">并发</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/缓存与并发/index.html">缓存与并发</a>
+        <span>第 1 / 2 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li></ol>
+    </nav>
     <div class="prose">
 <p>设备状态和权限字典在智慧工地项目里是被高频读的：大屏每几秒刷一次，每个接口都要查当前用户权限。这类数据变化不频繁，放进 Redis 很合适，问题是<strong>热点 key 过期的那一刻</strong>——如果几千个请求同时发现缓存没了，会一起打到 MySQL 上。</p>
 <h2>两种方案，先想清楚要什么</h2>
@@ -146,8 +151,9 @@
 <p>逻辑过期的核心不是"异步重建"这四个字，而是围绕它的一圈配套：<strong>重建互斥、锁续期、线程池隔离、失败退避</strong>。少任何一个，方案都会在压测或者线上某一刻失效。</p>
 <p>至于具体数值，建议自己压一遍再决定 —— 我这套参数也是本地压测之后才定下来的，别人环境里的数字对你不一定有参考价值。</p>
     </div>
+    <div class="chapter-nav"><a class="ch-next" href="../../posts/threadlocal-context-leak/index.html"><span>下一章</span>ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></div>
     <footer class="article-foot">
-      <div><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">← MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <a href="../../posts/websocket-behind-nginx/index.html">下一篇：WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 →</a></div>
+      <div><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">← MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <a href="../../posts/agent-memory-layers/index.html">下一篇：让 Agent 记住这个项目：记忆分三层，别混成一层 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

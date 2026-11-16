@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>缓存与并发 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="缓存与并发 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article column">
+    <header class="article-head">
+      <p class="section-label">专栏 · 2 章</p>
+      <h1>缓存与并发</h1>
+      
+      <p class="col-start"><a href="../../posts/redis-logical-expire/index.html">从第一章开始读 →</a></p>
+    </header>
+    <ol class="col-list">
+      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">01</span>
+          <h3><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></h3>
+          <span class="col-date">2026 年 11 月 12 日</span>
+        </div>
+        <p class="col-sum">两种方案对比、逻辑过期的实现方式，以及重建互斥、锁续期、线程池隔离、失败退避这四个必须处理的细节。</p>
+        <p class="col-meta">约 4 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">02</span>
+          <h3><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></h3>
+          <span class="col-date">2026 年 11 月 15 日</span>
+        </div>
+        <p class="col-sum">两个账号同时操作，一个看到了另一个的数据。本地怎么都复现不了，根因是 Tomcat 线程池复用线程时上一次的 ThreadLocal 没被清掉。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>
+    </ol>
+    <footer class="article-foot">
+      <div><a href="../../series/index.html">所有专栏</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

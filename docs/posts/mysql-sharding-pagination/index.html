@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 16 日</span>
         <span>更新 2026 年 11 月 16 日</span>
         <span>约 3 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#存储选型">系列 · 存储选型（2 篇）</a>
+        <a class="tag tag-series" href="../../series/存储选型/index.html">专栏 · 存储选型（2 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#分表">分表</a><a class="tag" href="../../tags/index.html#分页">分页</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/存储选型/index.html">存储选型</a>
+        <span>第 2 / 2 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a></li><li class="cur"><span class="ch-num">02</span><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a></li></ol>
+    </nav>
     <div class="prose">
 <p>ServerOps 里操作日志涨得最快，一个月就过了千万。按时间分表（<code>op_log_202608</code>、<code>op_log_202609</code>……）之后写入压力下来了，但后台的日志列表页挂了。</p>
 <p>原因很直接：原来一句 <code>SELECT * FROM op_log ORDER BY create_time DESC LIMIT 20</code> 解决的事，现在要跨十几张表。</p>
@@ -120,8 +125,9 @@ LIMIT 20;
 <p>分表本身不难，难的是<strong>分完之后原来那些"顺手就能写"的查询全部要重写</strong>。所以做决定之前先问自己：这张表的查询模式是什么？如果答案是"什么条件都可能查"，那可能不该分表，该做的是归档 —— 热数据留一张表，冷数据挪走。</p>
 <p>这两个思路经常被混淆：<strong>分表解决写入和存储，归档解决查询范围</strong>。搞反了就会像我第一版那样，问题一个没少。</p>
     </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/influxdb-vs-mysql-for-metrics/index.html"><span>上一章</span>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a></div>
     <footer class="article-foot">
-      <div><a href="../../posts/threadlocal-context-leak/index.html">← ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a> <a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">下一篇：接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架 →</a></div>
+      <div><a href="../../posts/threadlocal-context-leak/index.html">← ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a> <a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">下一篇：自己写网关踩的两个坑：限流没生效，熔断不触发 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

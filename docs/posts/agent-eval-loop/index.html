@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 16 日</span>
+        <span>更新 2026 年 11 月 16 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#ai-agent">AI Agent</a><a class="tag" href="../../tags/index.html#评测">评测</a><a class="tag" href="../../tags/index.html#回归">回归</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 6 / 6 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li class="cur"><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>前五章改了很多东西：切片大小、召回条数、记忆注入、合并规则。每一次改完，我都拿同一段代码试一遍，看输出，觉得"这次明显更准了"。</p>
+<p>问题在于我每次都拿同一段代码试。那段代码我太熟了，知道它有哪些问题，潜意识里就会往"这次报全了"的方向判。</p>
+<p>真正的转折是第三次改切片：从 1200 字改到 800 字，手感上更准，实际是把一个跨函数的上下文切断了，模型再也拼不出完整链路。</p>
+<h2>评测集不是测试集</h2>
+<p>一开始我想写单元测试，很快发现不对：评审结果不是布尔值，没有"正确/错误"这种判断。同一条问题，描述不同、位置差一行，都可能是合理的。</p>
+<p>所以评测集是<strong>带标注的样例</strong>，不是断言：</p>
+<pre><code class="language-text">case-01  空指针未判空          → 期望命中，位置 12-14 行
+case-02  资源申请未释放        → 期望命中，位置 30 行
+case-03  命名不规范            → 期望命中，位置 8 行
+case-04  格式良好但风格老旧的代码 → 期望不报（负样本）
+case-05  单行 if 省略花括号     → 期望不报（已知误报，靠记忆压掉）
+</code></pre>
+<p>核心是有了负样本。只准备"应该报的问题"会让指标永远向上——加点规则就多命中几条，看起来一直在进步。</p>
+<p>我现在的集子里正负样本大概 2:1。负样本里最有用的是两类：<strong>已经修好但长得像坏代码的</strong>，和<strong>历史上误报过的</strong>。</p>
+<h2>三个指标，只看两个</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>定义</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>召回</td>
+<td>标注的问题被报出来的比例</td>
+<td>主指标</td>
+</tr>
+<tr>
+<td>误报率</td>
+<td>报出来但不在标注里的条数 / 总条数</td>
+<td>主指标</td>
+</tr>
+<tr>
+<td>位置准确率</td>
+<td>行号落在标注范围内的比例</td>
+<td>参考</td>
+</tr>
+</tbody>
+</table>
+<p>前两个看趋势，第三个只在明显下滑时查。行号差一两行通常是可接受的，为它优化会带偏整个规则设计。</p>
+<p>有个必须一起记录的东西：<strong>耗时</strong>。加了记忆注入和两轮检索之后，单次评审从 1.2 秒涨到了 3 秒多。召回涨了两个点，但交互上明显变卡。这种权衡只能靠数据摆出来，靠手感永远是"再准一点更好"。</p>
+<h2>怎么跑</h2>
+<p>不搭平台，一个脚本就够：</p>
+<pre><code class="language-bash">python eval/run.py --cases eval/cases --out eval/runs/2026-11-16.json
+</code></pre>
+<p>每个 case 是一段代码 + 一份 JSON 标注。跑完把结果写成一行摘要，追加到 <code>eval/history.md</code>：</p>
+<pre><code class="language-text">2026-11-16  chunk=800  mem=on   召回 0.86  误报 0.11  平均 3.1s
+2026-11-14  chunk=1200 mem=on   召回 0.79  误报 0.09  平均 2.2s
+2026-11-12  chunk=800  mem=off  召回 0.83  误报 0.18  平均 2.9s
+</code></pre>
+<p>这张表比任何一次"我觉得更准了"都有说服力。翻回去看，记忆注入的收益（误报从 0.18 降到 0.11）其实比切片调整大得多，而我当时的直觉是反过来的。</p>
+<h2>评测最容易骗自己的三件事</h2>
+<p><strong>一次只改一个变量。</strong> 我干过同时改切片和召回条数，结果指标掉了，完全不知道是谁的责任。现在改之前先把当前状态记录一条基线。</p>
+<p><strong>不要用改过的用例。</strong> 发现某条没报，就把标注补上——这叫对着答案改卷子。用例只在"这条标注本身错了"的时候才动，且要单独记一笔原因。</p>
+<p><strong>注意缓存。</strong> 检索有缓存、工具结果有缓存，第二次跑同一个 case 会快很多也"准"很多（因为命中了上一次的缓存）。跑评测前必须清缓存，否则数字没有可比性。</p>
+<h2>六章写完了</h2>
+<p>回头看这个系列，六章其实是六个"我以为很简单"：</p>
+<ol>
+<li>以为 Agent 是框架问题，其实是循环和工具设计</li>
+<li>以为接协议是加依赖，其实是版本冲突和序列化层</li>
+<li>以为切片是调参数，其实决定了模型能看到什么因果</li>
+<li>以为记忆是向量库，其实是分层和过期治理</li>
+<li>以为容错是 try-catch，其实是给模型保留决策权</li>
+<li>以为评测要写测试，其实是攒带标注的样本</li>
+</ol>
+<p>这个项目还在改。下一个想动的是把检索的相似度阈值做成可配置的，现在硬编码在里面，调一次要重新打包——又是一件"看起来很简单"的事。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/agent-tool-degradation/index.html"><span>上一章</span>工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/cpp-reactor-return-vs-break/index.html">← Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

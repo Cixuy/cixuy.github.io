@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>系列 · Cixuy</title>
+<title>专栏 · Cixuy</title>
 <meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
-<meta property="og:title" content="系列 · Cixuy">
+<meta property="og:title" content="专栏 · Cixuy">
 <meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="../../assets/style.css">
@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -36,30 +36,54 @@
   </div>
 </header>
 <main class="wrap">
-  <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">系列</h1></section>
-    <section id="存储选型" style="margin-bottom:36px">
-      <p class="section-label">存储选型 · 2 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 9 日</span></li><li><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+  <section class="hero" style="padding-bottom:16px"><h1 style="font-size:24px">专栏</h1><p class="lede">按主题成组写的长系列，一章一个问题，按顺序读。</p></section>
+    <section class="column-card" id="从零做一个-ai-agent">
+      <p class="section-label">专栏 · 6 章 · 最近更新 2026 年 11 月 16 日</p>
+      <h2><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a></h2>
+      <p class="col-desc">从一次工具调用循环开始，到 MCP 协议接入、上下文预算、项目记忆、降级容错和回归评测，六章记录我做一个代码评审 Agent 的全过程。</p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li></ol>
+      <p class="col-more">还有 2 章</p>
+      <p class="col-enter"><a href="../../series/从零做一个-ai-agent/index.html">进入专栏 →</a></p>
     </section>
-    <section id="缓存与并发" style="margin-bottom:36px">
-      <p class="section-label">缓存与并发 · 2 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 12 日</span></li><li><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 15 日</span></li></ul>
+    <section class="column-card" id="存储选型">
+      <p class="section-label">专栏 · 2 章 · 最近更新 2026 年 11 月 16 日</p>
+      <h2><a href="../../series/存储选型/index.html">存储选型</a></h2>
+      
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/influxdb-vs-mysql-for-metrics/index.html">MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</a></li><li><span class="ch-num">02</span><a href="../../posts/mysql-sharding-pagination/index.html">MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a></li></ol>
+      
+      <p class="col-enter"><a href="../../series/存储选型/index.html">进入专栏 →</a></p>
     </section>
-    <section id="ai-agent-实践" style="margin-bottom:36px">
-      <p class="section-label">AI Agent 实践 · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    <section class="column-card" id="缓存与并发">
+      <p class="section-label">专栏 · 2 章 · 最近更新 2026 年 11 月 15 日</p>
+      <h2><a href="../../series/缓存与并发/index.html">缓存与并发</a></h2>
+      
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li></ol>
+      
+      <p class="col-enter"><a href="../../series/缓存与并发/index.html">进入专栏 →</a></p>
     </section>
-    <section id="go-服务端" style="margin-bottom:36px">
-      <p class="section-label">Go 服务端 · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">自己写网关踩的两个坑：限流没生效，熔断不触发</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    <section class="column-card" id="go-服务端">
+      <p class="section-label">专栏 · 1 章 · 最近更新 2026 年 11 月 16 日</p>
+      <h2><a href="../../series/go-服务端/index.html">Go 服务端</a></h2>
+      
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">自己写网关踩的两个坑：限流没生效，熔断不触发</a></li></ol>
+      
+      <p class="col-enter"><a href="../../series/go-服务端/index.html">进入专栏 →</a></p>
     </section>
-    <section id="websocket-实时通信" style="margin-bottom:36px">
-      <p class="section-label">WebSocket 实时通信 · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 14 日</span></li></ul>
+    <section class="column-card" id="websocket-实时通信">
+      <p class="section-label">专栏 · 1 章 · 最近更新 2026 年 11 月 14 日</p>
+      <h2><a href="../../series/websocket-实时通信/index.html">WebSocket 实时通信</a></h2>
+      
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/websocket-behind-nginx/index.html">WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a></li></ol>
+      
+      <p class="col-enter"><a href="../../series/websocket-实时通信/index.html">进入专栏 →</a></p>
     </section>
-    <section id="系统编程" style="margin-bottom:36px">
-      <p class="section-label">系统编程 · 1 篇</p>
-      <ul class="prose" style="font-size:15px"><li><a href="../../posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a> <span style="color:var(--faint);font-size:13px">2026 年 11 月 16 日</span></li></ul>
+    <section class="column-card" id="系统编程">
+      <p class="section-label">专栏 · 1 章 · 最近更新 2026 年 11 月 16 日</p>
+      <h2><a href="../../series/系统编程/index.html">系统编程</a></h2>
+      
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a></li></ol>
+      
+      <p class="col-enter"><a href="../../series/系统编程/index.html">进入专栏 →</a></p>
     </section>
 </main>
 <footer class="site-footer">

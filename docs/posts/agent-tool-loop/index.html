@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>先别急着上框架：一次工具调用循环到底长什么样 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="先别急着上框架：一次工具调用循环到底长什么样 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>先别急着上框架：一次工具调用循环到底长什么样</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 4 日</span>
+        <span>更新 2026 年 11 月 4 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#ai-agent">AI Agent</a><a class="tag" href="../../tags/index.html#工具调用">工具调用</a><a class="tag" href="../../tags/index.html#mcp">MCP</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 1 / 6 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>刚开始我以为"Agent"是个框架问题：装个 LangChain 或者 Spring AI，写几个 Tool 注解，就算接入了。</p>
+<p>真做起来才发现，框架只是把这个循环包了一层。理解不了循环本身，出了事完全不知道从哪查——模型为什么又调了一次同样的工具、为什么明明查到数据却说没查到、为什么第六轮之后开始胡编。</p>
+<h2>循环本身没有魔法</h2>
+<p>一次普通的大模型请求是：给消息，拿回答。Agent 的差别只有一条：模型可以选择"我不回答，我先要一个工具的执行结果"。</p>
+<p>于是整个系统就是一段循环：</p>
+<pre><code class="language-text">messages = [system, user]
+
+for step in 1..max_steps:
+    resp = model(messages, tools)
+
+    if resp.stop_reason != &quot;tool_call&quot;:
+        return resp.text            # 模型决定回答，结束
+
+    for call in resp.tool_calls:
+        result = run(call.name, call.args)
+        messages.append(tool_result(call.id, result))
+</code></pre>
+<p>真实代码里 <code>run()</code> 是一个按名字分发的 map，<code>tool_result</code> 是一条 <code>role: "tool"</code> 的消息，带上调用 ID 与结果文本。模型下一轮看到的就是"我要的东西回来了"，然后决定继续要还是收尾。</p>
+<p>没有状态机，没有规划器，没有反思。所谓 Agent 能力，全都长在这段循环和每个工具的返回值上。</p>
+<h2>我给评审服务暴露了 6 个工具</h2>
+<p>做代码评审的时候，工具不是越多越好，而是要让模型能"自己决定去看什么"：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>review_code</code></td>
+<td>对一段代码跑规则，返回问题清单</td>
+</tr>
+<tr>
+<td><code>search_similar</code></td>
+<td>检索历史上相似问题</td>
+</tr>
+<tr>
+<td><code>get_memory</code> / <code>set_memory</code></td>
+<td>读写项目级规则（比如"忽略某条规则"）</td>
+</tr>
+<tr>
+<td><code>list_rules</code></td>
+<td>列出当前生效的规则</td>
+</tr>
+<tr>
+<td><code>explain_rule</code></td>
+<td>解释某条规则为什么存在</td>
+</tr>
+</tbody>
+</table>
+<p>这里有个反直觉的点：<strong><code>review_code</code> 一次就能把问题全列出来，为什么还要给检索和记忆？</strong></p>
+<p>因为评审结论要能说服人。只报"第 12 行命名不规范"没用，得能补一句"这个项目历史上出现过三次同类问题，最近一次在 9 月"。证据靠检索拿，规则偏好靠记忆拿，这两件事模型自己判断不了要不要，必须做成工具让它自己决定调不调。</p>
+<h2>第一版漏掉的四个细节</h2>
+<h3>1. 没有上限，循环停不下来</h3>
+<p>第一版 <code>while true</code>，靠模型自己收敛。结果遇到一个输入，模型连续四轮调 <code>search_similar</code>，每次都换关键词，每次都拿回一堆相似度不高的片段，越查越糊。</p>
+<p>必须给两条硬约束：</p>
+<ul>
+<li><code>max_steps</code>：超过就强制收尾，把已有结论直接返回，并标注"未完成全部检查"</li>
+<li>同一个工具 + 同一组参数，第二次调用直接返回缓存结果，并附一句"该查询已执行过"</li>
+</ul>
+<p>第二条比第一条有用得多。模型在循环里最容易犯的错就是重复劳动，把重复结果原样还给它，它自己就会换路子。</p>
+<h3>2. 工具返回的东西必须截断</h3>
+<p><code>search_similar</code> 一开始返回完整片段，一次召回 8 段、每段上千字，第二轮就把上下文撑满了，模型开始丢前面的指令。</p>
+<p>后来改成：每段只回前 200 字 + 相似度分数 + 片段 ID，如果模型想看细节，再用 ID 调一次 <code>read_chunk</code>。把"看什么"的决定权交回给模型，而不是一次性灌满。</p>
+<h3>3. 工具报错不能抛异常</h3>
+<p>工具内部抛异常，整个请求就断了，模型完全不知道发生了什么。正确的做法是把错误当成一次正常观测：</p>
+<pre><code class="language-json">{ &quot;ok&quot;: false, &quot;error&quot;: &quot;review_code 超时（3000ms），静态分析服务可能没起来&quot;, &quot;hint&quot;: &quot;可以先用本地规则跑一遍&quot; }
+</code></pre>
+<p>模型看到这段，通常会自己降级——换个工具、或者直接基于已有信息作答。抛异常等于把决策权从模型手里拿走，而这恰恰是 Agent 的价值所在。</p>
+<h3>4. 并行调用是批量的，不是并发的</h3>
+<p>模型一次可能返回多个 <code>tool_call</code>。我一开始顺序执行，一个个等，一个 800ms 的工具调用三次就是 2.4 秒。</p>
+<p>其实同一轮里的多个调用之间通常没有依赖（模型是同时想出来的），可以并发执行再按顺序拼回结果。要注意的是：<strong>同一个轮次里如果两个工具写同一份状态，就不能并发</strong>。我的 <code>set_memory</code> 是写库，所以按工具名做了个白名单，只允许只读工具并行。</p>
+<h2>这一章的一句话总结</h2>
+<p>Agent 的能力上限由三件事决定：工具设计得好不好、返回值裁得够不够、错误喂得对不对。框架换哪个都一样，这三件事不变。</p>
+<p>下一章写把这套东西暴露成标准协议——接 MCP 的时候，我在 Jackson 版本上卡了整整一个下午。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-next" href="../../posts/mcp-java-sdk-jackson-conflict/index.html"><span>下一章</span>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">下一篇：接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

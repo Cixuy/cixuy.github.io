@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>从零做一个 AI Agent · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="从零做一个 AI Agent · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article column">
+    <header class="article-head">
+      <p class="section-label">专栏 · 6 章</p>
+      <h1>从零做一个 AI Agent</h1>
+      <p class="lede">从一次工具调用循环开始，到 MCP 协议接入、上下文预算、项目记忆、降级容错和回归评测，六章记录我做一个代码评审 Agent 的全过程。</p>
+      <p class="col-start"><a href="../../posts/agent-tool-loop/index.html">从第一章开始读 →</a></p>
+    </header>
+    <ol class="col-list">
+      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">01</span>
+          <h3><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></h3>
+          <span class="col-date">2026 年 11 月 4 日</span>
+        </div>
+        <p class="col-sum">把 Agent 拆开看，它只是一段 while 循环：问模型、执行它点名的工具、把结果塞回去、再问。这一章写清楚这个循环的最小实现，以及我第一版漏掉的四个细节。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">02</span>
+          <h3><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></h3>
+          <span class="col-date">2026 年 11 月 6 日</span>
+        </div>
+        <p class="col-sum">编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</p>
+        <p class="col-meta">约 2 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">03</span>
+          <h3><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></h3>
+          <span class="col-date">2026 年 11 月 8 日</span>
+        </div>
+        <p class="col-sum">一个代码文件几千行，全塞进去模型就开始丢指令；塞太少又看不出跨文件关系。这一章写我怎么定 800 / 8000 这两个数，以及预算超了之后先砍谁。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">04</span>
+          <h3><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></h3>
+          <span class="col-date">2026 年 11 月 12 日</span>
+        </div>
+        <p class="col-sum">会话记忆、项目记忆、检索出来的证据，这三样东西混在一起是灾难。这一章写我怎么把&quot;记住&quot;拆开存、怎么决定什么时候写回去，以及过期规则怎么清。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">05</span>
+          <h3><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></h3>
+          <span class="col-date">2026 年 11 月 14 日</span>
+        </div>
+        <p class="col-sum">评审 Agent 背后有两个引擎：C++ 静态分析服务和 Java 规则引擎。它们会超时、会给出重复结论、会互相矛盾。这一章写合并规则和三层降级，以及为什么错误信息也要写成给模型看的样子。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">06</span>
+          <h3><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></h3>
+          <span class="col-date">2026 年 11 月 16 日</span>
+        </div>
+        <p class="col-sum">调切片大小、改合并策略、加一条记忆规则，每次改完都觉得&quot;看起来更好了&quot;。这一章写我怎么用一套固定用例把这种错觉压下去，以及评测集到底该长什么样。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>
+    </ol>
+    <footer class="article-foot">
+      <div><a href="../../series/index.html">所有专栏</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

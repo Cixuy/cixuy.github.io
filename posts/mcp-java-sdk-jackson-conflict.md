@@ -1,9 +1,10 @@
 ---
 title: 接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架
-date: 2026-11-16
+date: 2026-11-06
 summary: 编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。
 tags: MCP, Java, Jackson, Spring Boot
-series: AI Agent 实践
+series: 从零做一个 AI Agent
+chapter: 2
 ---
 
 给代码评审服务加 MCP 支持，让外部 AI 客户端能把"评审代码"当成一个工具调用。用的是官方 Java SDK，`io.modelcontextprotocol.sdk:mcp:1.1.5`，加一行依赖就完事。

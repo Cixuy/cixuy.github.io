@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 14 日</span>
+        <span>更新 2026 年 11 月 14 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#ai-agent">AI Agent</a><a class="tag" href="../../tags/index.html#容错">容错</a><a class="tag" href="../../tags/index.html#降级">降级</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 5 / 6 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li class="cur"><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>单机 Demo 里工具总是成功的。上线第一天就会遇到：静态分析服务没起来、请求超时、两个引擎对同一行给出不同结论。</p>
+<p>这一章写三件具体的事：超时怎么设、两个引擎的结果怎么合、失败怎么让模型知道。</p>
+<h2>为什么要有两个引擎</h2>
+<p>代码评审的规则分两种，需要的实现方式完全不同：</p>
+<ul>
+<li><strong>单行正则类</strong>：命名不规范、魔法数字、硬编码路径。这类规则数量多、跑得快，纯文本扫描足够</li>
+<li><strong>跨行判断类</strong>：资源泄漏（申请了没释放）、锁的配对、分支里缺少返回。这类要维护上下文，得靠状态机</li>
+</ul>
+<p>我把前者放进了 C++ 静态分析服务（顺带练手 epoll 和手写 HTTP），后者留在 Java 规则引擎。对 Agent 来说，这两者都是 <code>review_code</code> 工具背后的实现细节——但合并逻辑必须由 Agent 这层负责。</p>
+<h2>合并：按"规则 + 行号"去重</h2>
+<p>两个引擎都会命中同一行。直接拼接的结果是同一个问题报两遍，模型看到重复信息会当成"问题严重"，优先级全乱。</p>
+<p>去重键用 <code>规则 ID + 行号</code>：</p>
+<pre><code class="language-text">(cpp, naming, 12)      → 保留
+(java, naming, 12)     → 与上面同键，合并
+</code></pre>
+<p>同键冲突时的取舍规则：</p>
+<ol>
+<li>严重级别取高的（error &gt; warn &gt; info）</li>
+<li>描述取信息量大的（长度不是标准，我用的是"是否包含修复建议"）</li>
+<li>来源标记成 <code>cpp+java</code>，报告里注明两个引擎都报了</li>
+</ol>
+<p>第三条很关键。后续调规则的时候，"两个引擎都报"和"只有一个报"是完全不同的信号，把来源抹掉就再也查不出来了。</p>
+<p>排序不能只按严重级别，否则同一级别里行号乱跳，人看不下去。最终排序是 <code>severity desc, line asc, rule asc</code>。</p>
+<h2>超时：给工具设，不给循环设</h2>
+<p>最开始我想的是"整个评审最多 10 秒"，超了直接返回。问题是这会杀掉一个已经跑到一半、结论基本可用的流程。</p>
+<p>正确的位置是<strong>单个工具调用</strong>上：</p>
+<pre><code class="language-java">// 静态分析服务，本地调用，正常 40ms 内返回
+CallResult r = staticClient.review(code, Duration.ofMillis(800));
+if (r.timeout()) {
+    return ToolResult.partial(&quot;静态分析超时，本次只有 Java 规则结果&quot;, javaIssues);
+}
+</code></pre>
+<p>超时值我给到 800ms，是压测出来的：正常 40ms 左右，网络抖动最差见过 300ms，800ms 已经能覆盖绝大多数抖动，再往下调会开始误杀。</p>
+<p>关键是超时之后<strong>不能返回空</strong>，要返回"部分结果 + 一句话说明缺了什么"。模型拿到这句话，会在最终回答里主动补一句"本次未包含静态分析"，而不是假装什么都没发生。</p>
+<h2>三层降级</h2>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>处理</th>
+<th>模型看到什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>静态服务超时</td>
+<td>只用 Java 规则</td>
+<td>部分结果 + 缺项说明</td>
+</tr>
+<tr>
+<td>静态服务连接失败</td>
+<td>退回本地正则兜底</td>
+<td>结果 + "静态分析不可用，已用本地规则"</td>
+</tr>
+<tr>
+<td>Java 规则引擎异常</td>
+<td>直接报工具失败</td>
+<td>错误 + 建议换个方式</td>
+</tr>
+</tbody>
+</table>
+<p>第三条是故意不做兜底的。规则引擎挂掉说明代码有 bug，此时任何"兜底结论"都不可信，宁可让模型知道这条路走不通。</p>
+<p>还有一层容易被忽略：<strong>降级之后要标数据来源</strong>。报告里每个问题都带 <code>source: cpp | java | local</code>，前端按来源上色。用户看到一片"local"，就知道该去查服务了，而不是以为代码突然变干净了。</p>
+<h2>错误信息是写给模型看的</h2>
+<p>这一点我改了三版才明白。第一版直接把 Java 异常 message 返回：</p>
+<pre><code class="language-text">java.net.ConnectException: Connection refused: localhost:18080
+</code></pre>
+<p>模型看到这行，基本只会回一句"评审服务出现错误"，然后结束。</p>
+<p>第二版加了 hint：</p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: false,
+  &quot;error&quot;: &quot;连接静态分析服务失败（localhost:18080）&quot;,
+  &quot;hint&quot;: &quot;该服务通常随主服务一起启动；可以改用 review_code_local 跑本地规则&quot;,
+  &quot;retryable&quot;: true
+}
+</code></pre>
+<p>模型这次会自己换工具重试。</p>
+<p>第三版又加了 <code>retryable</code>：可重试的错误（超时、连接失败）它才会重试，不可重试的（参数格式错）它会直接放弃并说明。不加这个字段，模型会对着一个必然失败的工具反复试到 max_steps。</p>
+<h2>一个反直觉的结论</h2>
+<p>做降级的过程中最大的收获不是容错代码，而是：<strong>尽量让失败也返回结构化结果，而不是抛异常。</strong></p>
+<p>异常是给程序员看的，结构化失败才是给 Agent 看的。前者中断流程，后者保留决策权。整个循环里唯一应该抛异常的地方，是参数校验失败——那种情况重试也没意义。</p>
+<p>下一章写最后一件事：怎么知道这些改动（规则、切片、合并策略）到底让效果变好了还是变坏了。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/agent-memory-layers/index.html"><span>上一章</span>让 Agent 记住这个项目：记忆分三层，别混成一层</a><a class="ch-next" href="../../posts/agent-eval-loop/index.html"><span>下一章</span>改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/websocket-behind-nginx/index.html">← WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</a> <a href="../../posts/threadlocal-context-leak/index.html">下一篇：ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

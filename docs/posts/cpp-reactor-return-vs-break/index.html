@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 16 日</span>
         <span>更新 2026 年 11 月 16 日</span>
         <span>约 3 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#系统编程">系列 · 系统编程（1 篇）</a>
+        <a class="tag tag-series" href="../../series/系统编程/index.html">专栏 · 系统编程（1 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#c">C++</a><a class="tag" href="../../tags/index.html#epoll">epoll</a><a class="tag" href="../../tags/index.html#reactor">Reactor</a><a class="tag" href="../../tags/index.html#http">HTTP</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/系统编程/index.html">系统编程</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/cpp-reactor-return-vs-break/index.html">Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</a></li></ol>
+    </nav>
     <div class="prose">
 <p>用 C++ 写了个小的 HTTP 服务，epoll + 非阻塞 IO，读了数据、解了请求、生成了响应。启动正常，端口能连上，但 <code>curl</code> 一直是空白——不报错，也不超时，就是没输出。</p>
 <p>这种"什么都不发生"的现象最难查，因为没有错误信息。</p>
@@ -155,7 +160,7 @@ for (;;) { parse_request(in.data(), in.size(), req); ... }
 <p>这里用的是 <code>std::string</code>，<code>erase</code> 可能导致重新分配。如果哪天换成自己管理的缓冲区，这个细节就是内存错误的来源。</p>
     </div>
     <footer class="article-foot">
-      <div><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">← 自己写网关踩的两个坑：限流没生效，熔断不触发</a></div>
+      <div><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">← 自己写网关踩的两个坑：限流没生效，熔断不触发</a> <a href="../../posts/agent-eval-loop/index.html">下一篇：改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

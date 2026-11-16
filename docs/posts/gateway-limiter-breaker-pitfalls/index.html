@@ -28,7 +28,7 @@
     <nav class="nav">
       <a href="../../index.html">文章</a>
       <a href="../../tags/index.html">标签</a>
-      <a href="../../series/index.html">系列</a>
+      <a href="../../series/index.html">专栏</a>
       <a href="../../about/index.html">关于</a>
       <a href="../../feed.xml">RSS</a>
       <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
@@ -43,10 +43,15 @@
         <span>创建 2026 年 11 月 16 日</span>
         <span>更新 2026 年 11 月 16 日</span>
         <span>约 3 分钟</span>
-        <a class="tag tag-series" href="../../series/index.html#go-服务端">系列 · Go 服务端（1 篇）</a>
+        <a class="tag tag-series" href="../../series/go-服务端/index.html">专栏 · Go 服务端（1 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#go">Go</a><a class="tag" href="../../tags/index.html#网关">网关</a><a class="tag" href="../../tags/index.html#限流">限流</a><a class="tag" href="../../tags/index.html#熔断">熔断</a></span>
       </div>
     </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/go-服务端/index.html">Go 服务端</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/gateway-limiter-breaker-pitfalls/index.html">自己写网关踩的两个坑：限流没生效，熔断不触发</a></li></ol>
+    </nav>
     <div class="prose">
 <p>用 Go 写了个网关，限流用令牌桶，熔断用三态机。代码编译一次过，单元测试也懒得写就跑去验证——结果两个功能全哑了。</p>
 <p>排查过程和根因都挺典型，记一下。</p>
@@ -143,7 +148,7 @@ func (b *Breaker) Guard(next http.Handler) http.Handler {
 <p>这类问题编译期、甚至类型检查都发现不了，只有真的跑一次、真的看一眼计数，才会暴露。写完一个中间件就立刻验证一次，比攒到最后一起测要省事得多。</p>
     </div>
     <footer class="article-foot">
-      <div><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">← 接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a> <a href="../../posts/cpp-reactor-return-vs-break/index.html">下一篇：Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应 →</a></div>
+      <div><a href="../../posts/mysql-sharding-pagination/index.html">← MySQL 分表后的分页与聚合：跨表查询的三种处理方式</a> <a href="../../posts/cpp-reactor-return-vs-break/index.html">下一篇：Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

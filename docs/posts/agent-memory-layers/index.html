@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>让 Agent 记住这个项目：记忆分三层，别混成一层 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="让 Agent 记住这个项目：记忆分三层，别混成一层 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>让 Agent 记住这个项目：记忆分三层，别混成一层</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 12 日</span>
+        <span>更新 2026 年 11 月 12 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/从零做一个-ai-agent/index.html">专栏 · 从零做一个 AI Agent（6 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#ai-agent">AI Agent</a><a class="tag" href="../../tags/index.html#记忆">记忆</a><a class="tag" href="../../tags/index.html#rag">RAG</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/从零做一个-ai-agent/index.html">从零做一个 AI Agent</a>
+        <span>第 4 / 6 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/agent-tool-loop/index.html">先别急着上框架：一次工具调用循环到底长什么样</a></li><li><span class="ch-num">02</span><a href="../../posts/mcp-java-sdk-jackson-conflict/index.html">接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</a></li><li><span class="ch-num">03</span><a href="../../posts/agent-context-budget/index.html">上下文窗口不是无限口袋：8000 字符预算怎么切</a></li><li class="cur"><span class="ch-num">04</span><a href="../../posts/agent-memory-layers/index.html">让 Agent 记住这个项目：记忆分三层，别混成一层</a></li><li><span class="ch-num">05</span><a href="../../posts/agent-tool-degradation/index.html">工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></li><li><span class="ch-num">06</span><a href="../../posts/agent-eval-loop/index.html">改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>"记忆"这个词很容易把人带偏。一开始我以为记忆是一个向量库，把聊天记录全塞进去，下次全捞出来——结果捞出来的东西一半是废话，另一半和当前问题无关，纯占上下文。</p>
+<p>做下来发现记忆至少要分成三层，每层的生命周期、存储、注入方式都不一样，混在一起就没法维护。</p>
+<h2>三层记忆</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>生命周期</th>
+<th>存哪里</th>
+<th>干什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>会话记忆</td>
+<td>一次对话</td>
+<td>内存里的 messages</td>
+<td>让模型知道自己刚做过什么</td>
+</tr>
+<tr>
+<td>项目记忆</td>
+<td>长期，可人工修改</td>
+<td>MySQL 一行一条</td>
+<td>记住这个项目的偏好和结论</td>
+</tr>
+<tr>
+<td>证据（检索）</td>
+<td>只读，随时可重建</td>
+<td>向量库</td>
+<td>回答"为什么"时引用的原文</td>
+</tr>
+</tbody>
+</table>
+<p>会话记忆不用设计，就是循环里的消息数组。真正需要设计的是后两层——而它俩最容易被混成一个向量库。</p>
+<p>一句话区分：<strong>项目记忆是结论，检索是证据。</strong></p>
+<p>"这个项目不用 camelCase 命名"是结论，应该被直接遵守，不需要每次重新推。"9 月 12 日有个同类问题，当时改成下划线了"是证据，只在该用的时候被召回。</p>
+<h2>项目记忆长什么样</h2>
+<p>不是聊天记录，是一行一行的结构化条目：</p>
+<pre><code class="language-text">project_id | key              | value                        | enabled | updated_at
+cra        | ignore_rule      | 命名规范检查                  | 1       | 2026-10-08
+cra        | style            | 指标计算用 snake_case         | 1       | 2026-10-11
+cra        | known_issue      | 第 3 段正则误报 if 单行省略    | 1       | 2026-10-19
+</code></pre>
+<p>几个刻意的设计：</p>
+<p><strong>key 是枚举，不是自由文本。</strong> 如果让模型随便写 key，三个月后你会得到 40 个含义重叠的键，清理比重写还贵。我定了三类：忽略规则、风格约定、已知误报，超出的直接拒绝写入。</p>
+<p><strong>写入必须走工具，且带理由。</strong> 模型调 <code>set_memory</code> 时要求同时给 <code>reason</code>，理由为空就写不进去。这条约束压掉了很多"顺手记一下"的噪声。</p>
+<p><strong>enabled 是给人看的。</strong> 用户发现某条记忆不适用，可以在界面上关掉而不是删除。关掉的条目还在库里，方便回溯"为什么会得出这个结论"。</p>
+<h2>怎么注入</h2>
+<p>不是全量塞进 system prompt。我的做法是：</p>
+<ol>
+<li>按 <code>key</code> 分组，每组最多取最近 3 条，总数不超过 12 条</li>
+<li>按当前请求涉及的文件路径做一次粗筛（<code>known_issue</code> 里带路径的优先）</li>
+<li>拼成一小段结构化文本，不写成自然语言</li>
+</ol>
+<pre><code class="language-text">[项目约定]
+- 命名规范检查：已忽略（用户 2026-10-08 确认）
+- 指标计算：使用 snake_case
+[已知误报]
+- if 单行省略：第 3 段正则会误报，不要重复报告
+</code></pre>
+<p>自然语言写法的记忆最坑。模型会把"用户说过可能不用检查命名"理解成"有时要检查"，然后随机执行。结构化短句没有解释空间。</p>
+<h2>过期是最大的坑</h2>
+<p>记忆写进去容易，失效没人管。真实碰到两次：</p>
+<p><strong>第一次</strong>：忽略了"命名规范检查"，两周后代码重构完，命名都改好了，这条记忆还在，新代码里的命名问题全被吞掉了。</p>
+<p><strong>第二次</strong>：记了"第 3 段正则会误报"，我把正则修好之后忘了删，等于给错误开了永久豁免。</p>
+<p>后来加了两个机制：</p>
+<ul>
+<li>每条记忆带 <code>updated_at</code>，超过 30 天在注入时追加一句"该约定已 32 天未确认，如已不适用请关闭"</li>
+<li><code>known_issue</code> 类的记忆，规则代码变更时（用文件 hash 判断）自动标记为"待复核"，不再默认注入</li>
+</ul>
+<p>第二个机制有点像给记忆加了个 TTL，但触发条件是代码变更而不是时间——对设计类项目更准。</p>
+<h2>记忆和检索的边界</h2>
+<p>有个细节值得单独说：检索到的内容<strong>不写回记忆</strong>。</p>
+<p>早期版本里，模型查到一条"历史上有同类问题"，会顺手调 <code>set_memory</code> 记下来。结果库里堆满了检索结果的副本，第三次评审时召回的全是自己抄自己的结论，形成回音室。</p>
+<p>现在的规矩是：检索结果只作为这一轮的上下文，会话结束就没了；要沉淀成记忆，得由人确认，或者在界面上点一下"记住这条"。</p>
+<p>写入口收窄之后，记忆条数从两百多条降到了二十几条，但每条都能用。</p>
+<h2>下一章</h2>
+<p>记忆解决了"记住结论"，但结论很少百分之百可靠——下一章写工具挂了、超时了、两个引擎给出冲突结论时，Agent 该怎么降级，而不是直接崩给你看。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/agent-context-budget/index.html"><span>上一章</span>上下文窗口不是无限口袋：8000 字符预算怎么切</a><a class="ch-next" href="../../posts/agent-tool-degradation/index.html"><span>下一章</span>工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/redis-logical-expire/index.html">← 缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a> <a href="../../posts/websocket-behind-nginx/index.html">下一篇：WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置 →</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
