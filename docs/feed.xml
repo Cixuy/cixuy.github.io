@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 16 Nov 2026 19:34:29 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 17 Nov 2026 02:02:40 +0800</lastBuildDate>
     <item>
+      <title>JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token</title>
+      <link>https://cixuy.github.io/posts/jwt-logout-strategies/index.html</link>
+      <guid>https://cixuy.github.io/posts/jwt-logout-strategies/index.html</guid>
+      <description>JWT 最大的卖点是&quot;服务端不存状态&quot;，所以&quot;登出&quot;这件事天生就别扭。四种方案的实现方式、代价和适用场景，以及我最后为什么选了双 Token。</description>
+    </item>    <item>
       <title>从 MCP 到 A2A：多 Agent 协作到底难在哪</title>
       <link>https://cixuy.github.io/posts/a2a-multi-agent-collaboration/index.html</link>
       <guid>https://cixuy.github.io/posts/a2a-multi-agent-collaboration/index.html</guid>

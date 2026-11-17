@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 17 日</span>
+        <span>更新 2026 年 11 月 17 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/认证与权限/index.html">专栏 · 认证与权限（1 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#jwt">JWT</a><a class="tag" href="../../tags/index.html#认证">认证</a><a class="tag" href="../../tags/index.html#spring-security">Spring Security</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/认证与权限/index.html">认证与权限</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/jwt-logout-strategies/index.html">JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>面试里问 JWT，八成人能说出"无状态、不需要服务端存 session"；接着问一句"那用户点登出怎么办"，能答清楚的不多。</p>
+<p>这不是刁难 —— 这是 JWT 设计上真实存在的矛盾：<strong>令牌一旦签发，在过期之前就是有效的，服务端没有"作废"这个动作</strong>。</p>
+<p>我在智慧工地的权限模块里把四种方案都想过一遍，记录一下。</p>
+<h2>方案一：前端删掉 token</h2>
+<p>最省事：登出就是前端把 localStorage 里的 token 清掉，服务端什么都不做。</p>
+<p>问题很明显 —— token 还在有效期内，任何人拿到它都能继续用。如果员工离职前复制了自己的 token，登出对他毫无约束。</p>
+<p><strong>只适合一种场景：token 有效期极短（5 分钟内），且业务对"立即失效"没有要求。</strong></p>
+<h2>方案二：黑名单</h2>
+<p>签发时给每个 token 一个唯一 ID（JWT 标准里的 <code>jti</code>），登出时把这个 <code>jti</code> 写进 Redis，过期时间设为 token 剩余的有效期。每次校验时先查黑名单。</p>
+<pre><code class="language-java">// 登出
+String jti = claims.getId();
+long ttl = claims.getExpiration().getTime() - System.currentTimeMillis();
+redis.opsForValue().set(&quot;jwt:blacklist:&quot; + jti, &quot;1&quot;, ttl, TimeUnit.MILLISECONDS);
+</code></pre>
+<pre><code class="language-java">// 校验时
+if (Boolean.TRUE.equals(redis.hasKey(&quot;jwt:blacklist:&quot; + jti))) {
+    throw new TokenInvalidException();
+}
+</code></pre>
+<p>优点：能精确到单个 token，多设备互不影响。
+缺点：<strong>每个请求都要查一次 Redis</strong>，"无状态"实际上变成了"有状态"，只是状态从内存挪到了 Redis。高频接口上这是一笔真实开销（虽然本机 Redis 是亚毫秒级）。</p>
+<p>还有个容易漏的点：<strong><code>ttl</code> 必须按 token 剩余时间设置</strong>，设成固定值（比如 30 分钟）会导致 token 过期了黑名单还占着内存，或者反过来黑名单先过期、token 还能用。</p>
+<h2>方案三：token 版本号</h2>
+<p>用户表加一个 <code>token_version</code> 字段，签发时把当前版本写进 claims，校验时比对。登出或者改密码就把版本 +1。</p>
+<pre><code class="language-java">// 校验时
+Integer current = userCache.getTokenVersion(userId);
+if (!claims.get(&quot;ver&quot;, Integer.class).equals(current)) {
+    throw new TokenInvalidException();
+}
+</code></pre>
+<p>优点：一次对比，不用存每个 token。
+缺点：<strong>这是"全员登出"</strong> —— 用户在手机上登出，电脑上的登录也一起失效了。除非你的业务能接受（比如改密码就应该全踢），否则体验很差。</p>
+<h2>方案四：双 Token</h2>
+<p><code>access_token</code> 有效期短（我设的 30 分钟），<code>refresh_token</code> 有效期长（7 天）且<strong>存在服务端</strong>（Redis 或 MySQL）。</p>
+<ul>
+<li>登出：删掉 refresh_token 记录。access_token 最多再活 30 分钟。</li>
+<li>刷新：拿 refresh_token 换新的 access_token。</li>
+</ul>
+<p>优点：兼顾了性能和安全。大部分请求只校验 access_token 的签名，不查库；真正需要"作废"的 refresh_token 是存在服务端的。
+缺点：实现复杂，要处理刷新时机、并发刷新、refresh 被重放。</p>
+<h2>对比</h2>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>登出是否立即生效</th>
+<th>每请求开销</th>
+<th>实现复杂度</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端删除</td>
+<td>否</td>
+<td>无</td>
+<td>极低</td>
+<td>token 极短、无强制下线需求</td>
+</tr>
+<tr>
+<td>黑名单</td>
+<td>是（精确到设备）</td>
+<td>查 Redis</td>
+<td>低</td>
+<td>需要单设备登出</td>
+</tr>
+<tr>
+<td>版本号</td>
+<td>是（全员）</td>
+<td>查缓存</td>
+<td>低</td>
+<td>改密码全踢、简单系统</td>
+</tr>
+<tr>
+<td>双 Token</td>
+<td>access 不立即，refresh 立即</td>
+<td>无（除刷新）</td>
+<td>高</td>
+<td>有设备管理需求的产品</td>
+</tr>
+</tbody>
+</table>
+<h2>我为什么选双 Token</h2>
+<p>因为智慧工地那个系统有"设备管理"的需求 —— 用户要能在手机上看"我当前登录了哪几台设备，逐台踢掉"。这个功能只有 refresh_token 存服务端才做得出来，黑名单方案做不到（黑名单只知道 token 无效，不知道是哪个设备）。</p>
+<p>如果没这个需求，我会选<strong>方案二</strong>，代码量不到双 Token 的三分之一。</p>
+<h2>实现时的几个坑</h2>
+<p><strong>1. <code>jti</code> 一定要有。</strong> 不填 <code>jti</code> 的 JWT 在黑名单方案里根本没法定位。用 <code>UUID.randomUUID().toString()</code> 就行，别用时间戳（并发下会重复）。</p>
+<p><strong>2. 刷新接口要防重放。</strong> refresh_token 用一次就换一个新的（rotation），旧的立刻作废。如果同一个 refresh_token 被用了两次，说明可能泄露了，直接把该用户所有 refresh_token 清掉。</p>
+<p><strong>3. 别把权限塞进 token。</strong> 我第一版把角色列表写进了 claims，结果管理员改了某人的角色，得等 token 过期才生效。权限应该每次从缓存里取，token 里只放 <code>userId</code> 和 <code>jti</code>。</p>
+<p><strong>4. 并发刷新。</strong> 前端多个请求同时发现 access_token 过期，会并发触发刷新，把 refresh_token 用掉好几次。解决办法是前端加锁（只允许一个刷新请求在飞），或者后端允许多次刷新但只有一个成功。</p>
+<h2>小结</h2>
+<p>JWT 不是"不用管状态"，而是<strong>把状态从服务端的内存挪到了客户端，并且用签名保证它没被改过</strong>。一旦你有"作废"的需求，状态就得回来 —— 无非是决定它放在哪、代价是多少。</p>
+<p>所以选方案之前先回答一个问题：<strong>你的业务需要"立即踢下线"吗？</strong> 需要 → 黑名单或双 Token；不需要 → 老老实实用短有效期，登出就是前端删 token，别为了技术感把系统搞复杂。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/a2a-multi-agent-collaboration/index.html">← 从 MCP 到 A2A：多 Agent 协作到底难在哪</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
