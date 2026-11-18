@@ -18,6 +18,28 @@ python3 build.py --serve
 
 改完文章重新跑 `python3 build.py` 就行，`--serve` 只是顺便起个预览服务。
 
+推之前先跑一次体检，不用等构建完才发现文章头写错：
+
+```bash
+python3 build.py --check
+```
+
+它会校验 front-matter 必填字段（title / date / summary / tags）、`date` 是否 `YYYY-MM-DD`、
+同一系列里 chapter 有没有撞号、`./posts/xxx.md` 这类站内链接是否指向真实文章。
+有错返回 1，可以直接串进 pre-commit 或 CI：
+
+```
+$ python3 build.py --check
+检查 18 篇文章
+  · redis-outage-fallback.md: 系列《缓存与并发》没有 chapter（单篇系列可忽略）
+  ✗ _tmp_bad.md: 缺少字段 date
+$ echo $?
+1
+```
+
+「系列没有 chapter」只提示不报错 —— 单篇自成系列是合法的；真正会让归档乱掉的是**同系列章节号重复**
+和**日期格式错**（后者会让文章在归档里排到 9999 年或者永远不发布）。
+
 ## 写一篇新文章
 
 在 `posts/` 下新建 `你的-slug.md`，**文件名就是 URL**（比如 `redis-lock.md` → `/posts/redis-lock/`）。

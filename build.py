@@ -446,7 +446,68 @@ def build_404(prefix=""):
     return page("404", body)
 
 
+def check_posts():
+    """只做体检、不生成站点：校验 front-matter 必填项、日期格式、系列章节唯一性、站内链接。
+
+    写作时最容易犯的错是复制上一篇的 front-matter 忘了改 date/chapter，
+    生成出来的站点看着没问题，但归档顺序和系列目录就乱了。跑一次 --check 立刻暴露。
+    """
+    problems, warns = [], []
+    if not POSTS_DIR.exists():
+        print(f"找不到文章目录 {POSTS_DIR}")
+        return 1
+    files = sorted(POSTS_DIR.glob("*.md"))
+    seen_date_slug = {}
+    series_ch = {}
+    required = ("title", "date", "summary", "tags")
+    for f in files:
+        meta, body = parse_front_matter(f.read_text(encoding="utf-8"))
+        if not meta:
+            problems.append(f"{f.name}: 缺少 front-matter（开头要有 --- 包裹的头部）")
+            continue
+        for k in required:
+            if not meta.get(k):
+                problems.append(f"{f.name}: 缺少字段 {k}")
+        date = meta.get("date", "")
+        if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            problems.append(f"{f.name}: date 格式应为 YYYY-MM-DD，当前 {date!r}")
+        key = (date, f.stem)
+        if key in seen_date_slug:
+            problems.append(f"{f.name}: 与 {seen_date_slug[key]} 同日期同 slug")
+        seen_date_slug[key] = f.name
+        series, ch = meta.get("series", ""), meta.get("chapter", "")
+        if series:
+            if not ch:
+                # 单篇成系列是允许的，只提示不报错
+                warns.append(f"{f.name}: 系列《{series}》没有 chapter（单篇系列可忽略）")
+            elif not str(ch).isdigit():
+                problems.append(f"{f.name}: chapter 必须是数字，当前 {ch!r}")
+            else:
+                k2 = (series, int(ch))
+                if k2 in series_ch:
+                    problems.append(f"{f.name}: 系列《{series}》第 {ch} 章与 {series_ch[k2]} 重复")
+                series_ch[k2] = f.name
+        # 站内链接：md 里指向 ./xxx 或 posts/xxx 的目标应存在
+        for m in re.finditer(r"\]\((\.?\.?/?posts/[^)#]+\.md)", body):
+            target = POSTS_DIR / Path(m.group(1)).name
+            if not target.exists():
+                problems.append(f"{f.name}: 站内链接指向不存在的文章 {m.group(1)}")
+
+    print(f"检查 {len(files)} 篇文章")
+    for w in warns:
+        print("  · " + w)
+    if problems:
+        for x in problems:
+            print("  ✗ " + x)
+        return 1
+    print("  全部通过：必填字段、日期格式、系列章节、站内链接")
+    return 0
+
+
 def main():
+    if "--check" in sys.argv:
+        return check_posts()
+
     posts = load_posts()
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -515,4 +576,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
