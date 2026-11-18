@@ -5,7 +5,7 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 18 Nov 2026 02:10:57 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 18 Nov 2026 23:24:25 +0800</lastBuildDate>
     <item>
       <title>RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</title>
       <link>https://cixuy.github.io/posts/rag-chunking-tuning/index.html</link>
