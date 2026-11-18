@@ -1,6 +1,6 @@
 ---
 title: Go 的 GMP 调度：goroutine 阻塞时 P 去哪了
-date: 2026-11-22
+date: 2026-11-23
 summary: G、M、P 三者的关系，本地队列与 work stealing，系统调用时 P 的 handoff，以及 netpoller 怎么让网络 IO 不占线程——把「开十万个 goroutine 为什么不炸」讲清楚。
 tags: Go, GMP, 调度器, 并发
 ---

@@ -1,6 +1,6 @@
 ---
 title: C++ 移动语义：std::move 之后对象还剩什么
-date: 2026-11-24
+date: 2026-11-25
 summary: std::move 只是类型转换、moved-from 对象的真实状态、RVO 何时绕过移动、为什么返回局部变量不用 std::move——四个最常被写错的点。
 tags: C++, 移动语义, 右值引用, 性能
 ---

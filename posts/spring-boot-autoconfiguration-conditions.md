@@ -1,6 +1,6 @@
 ---
 title: Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean
-date: 2026-11-20
+date: 2026-11-21
 summary: 从 @SpringBootApplication 的三件套，到 AutoConfiguration.imports 的加载顺序，再到 @ConditionalOnMissingBean 为什么有时不生效——把自动配置的装配过程拆开看。
 tags: Spring Boot, 自动配置, Bean, Java
 ---

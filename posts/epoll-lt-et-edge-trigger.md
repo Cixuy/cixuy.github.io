@@ -1,6 +1,6 @@
 ---
 title: epoll 的 LT 与 ET：一次漏读怎么把连接挂死
-date: 2026-11-23
+date: 2026-11-24
 summary: 水平触发和边缘触发的判定条件、ET 为什么必须配非阻塞且循环读到 EAGAIN、EPOLLOUT 什么时候该注册——以及「连接还活着但再也不回包」是怎么来的。
 tags: epoll, Linux, 网络编程, C++
 ---
