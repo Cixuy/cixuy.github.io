@@ -1,6 +1,6 @@
 ---
 title: InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的
-date: 2026-11-19
+date: 2026-11-20
 summary: 从隐藏列、undo 版本链到 Read View 的四个字段，把「为什么我读到的是旧数据」「为什么另一个事务提交了我还看不见」讲成一条可以走通的路径。
 tags: MySQL, InnoDB, MVCC, 事务
 ---
