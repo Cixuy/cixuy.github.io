@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 18 日</span>
+        <span>更新 2026 年 11 月 18 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/ai-应用落地/index.html">专栏 · AI 应用落地（1 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#rag">RAG</a><a class="tag" href="../../tags/index.html#milvus">Milvus</a><a class="tag" href="../../tags/index.html#向量检索">向量检索</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/ai-应用落地/index.html">AI 应用落地</a>
+        <span>第 1 / 1 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/rag-chunking-tuning/index.html">RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>ServerOps 的运维知识库上线第一版时效果很差：问"磁盘告警怎么处理"，明明手册里有一整章讲这个，召回来的却是几段无关的日志格式说明。</p>
+<p>模型没问题，问题在<strong>送进去的东西不对</strong>。RAG 的效果上限基本由召回决定，而召回的质量大部分在切片那一步就定死了。</p>
+<h2>变量一：切片粒度</h2>
+<p>第一版按固定字数切，1000 字一片。效果差的原因现在看很明显：</p>
+<p><strong>语义被稀释。</strong> 一个 1000 字的段落可能同时讲了三件事，向量是所有内容的平均值。用户问其中一件，相似度被另外两件拉低了 —— 结果就是"哪一段都像，哪一段都不够像"。</p>
+<p>改成按<strong>文档结构</strong>切：先按标题层级切大块，再按自然段拆到 300～500 字。运维手册这种文档结构很清楚，"告警处理"、"配置说明"、"故障排查"本来就是分好的章节，利用现成的结构比自己算边界准得多。</p>
+<p><strong>遇到表格和代码怎么办？</strong> 固定长度切片会把它们从中间切断，切完的两半都失去了意义。我的处理是：表格和代码块作为<strong>原子块</strong>，不参与切分，整块当成一个 chunk；如果超过 800 字，就在行边界强行拆，并且在每个片段开头重复表头。</p>
+<h2>变量二：重叠</h2>
+<p>不设重叠的时候，一个跨片的答案会被切成两半。比如"当 CPU 使用率超过 90%，先检查……"这句在前一片结尾，"……再检查磁盘 IO"在后一片开头，两片单独看都不完整。</p>
+<p>我设的重叠是 50～80 字（片长的 15% 左右）。重叠太小不起作用，太大会导致同一个答案被召回多次、占用上下文。</p>
+<p><strong>一个容易忽略的细节</strong>：重叠是在切片的<strong>字符维度</strong>上做的，如果按自然段切，直接复制上一段的末尾就行；但要注意别把重叠部分当成独立段落喂给 embedding —— 拼接时用换行分隔，让模型知道这是连续内容。</p>
+<h2>变量三：Embedding 模型</h2>
+<p>这个变量最容易被忽略，因为很多人默认用通用模型。</p>
+<p>我一开始用的是通用多语言 embedding。测下来发现，中文技术文档里大量专有名词（InfluxDB、Flux、Redisson）和缩写（QPS、P95、RBAC），通用模型对这些词的区分度不高 —— "P95 延迟"和"P99 延迟"在向量空间里几乎一样近。</p>
+<p>换成对中文优化过的模型之后，召回明显改善。这类模型通常是基于中文语料训练、并且对长文本做了适配，具体选哪个跟你的文档语言、领域强相关，<strong>没有万能答案，只能测</strong>。</p>
+<h2>怎么用数据判断好坏</h2>
+<p>靠"感觉好像准了一点"来调参是没用的，必须有个可复现的评测集。我的做法很小：</p>
+<p>准备 <strong>20 个真实问题</strong>，每个问题标出"标准答案在哪一段"。然后算 <strong>Recall@3</strong> —— 前三个召回里有没有那个正确的段落。</p>
+<pre><code>20 个问题，Recall@3 = 12/20 = 60%
+调整切片参数之后 = 17/20 = 85%
+</code></pre>
+<p>这个数字能让你判断每次改动是不是真的有用。20 个问题一小时就能标完，投入产出比极高。</p>
+<p>有了评测集之后，调参就变成了很朴素的工作：一次只改一个变量，跑一遍，看数字。改切片粒度就固定重叠，改重叠就固定粒度。</p>
+<h2>我最后用的参数</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>切片粒度</td>
+<td>300～500 字</td>
+<td>小于 300 语义不全，大于 500 开始稀释</td>
+</tr>
+<tr>
+<td>重叠</td>
+<td>60 字左右</td>
+<td>覆盖一句话的长度</td>
+</tr>
+<tr>
+<td>切分依据</td>
+<td>标题层级 → 自然段</td>
+<td>利用文档结构，不按字数硬切</td>
+</tr>
+<tr>
+<td>特殊块</td>
+<td>表格/代码整块保留</td>
+<td>切开就没意义了</td>
+</tr>
+<tr>
+<td>召回数</td>
+<td>Top-5</td>
+<td>再多上下文会挤掉最近对话</td>
+</tr>
+</tbody>
+</table>
+<h2>另外两个提醒</h2>
+<p><strong>入库前先清洗。</strong> 手册里的页眉页脚、页码、"本文档由 XX 部门编制"这类内容对召回全是噪声。清洗掉之后效果会提升一截，这步比调参数划算。</p>
+<p><strong>元数据很有用。</strong> 每个 chunk 存上来源文档、章节、更新时间，召回时可以按来源过滤（"只查故障处理手册"），也可以把来源显示给用户 —— 用户看到"这段来自《磁盘告警处理指南》第 3 节"，对答案的信任度完全不一样。</p>
+<h2>小结</h2>
+<p>RAG 的调优顺序应该是：<strong>先清洗 → 再切片 → 再换模型 → 最后才考虑提示词</strong>。</p>
+<p>很多人反过来，一上来就改 Prompt、加 few-shot，那是在用生成端弥补检索端的问题，效果天花板很低。<strong>检索不到的东西，提示词写得再好也变不出来。</strong></p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/jwt-logout-strategies/index.html">← JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

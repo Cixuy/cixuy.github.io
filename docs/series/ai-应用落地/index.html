@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 应用落地 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="AI 应用落地 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article column">
+    <header class="article-head">
+      <p class="section-label">专栏 · 1 章</p>
+      <h1>AI 应用落地</h1>
+      
+      <p class="col-start"><a href="../../posts/rag-chunking-tuning/index.html">从第一章开始读 →</a></p>
+    </header>
+    <ol class="col-list">
+      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">01</span>
+          <h3><a href="../../posts/rag-chunking-tuning/index.html">RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</a></h3>
+          <span class="col-date">2026 年 11 月 18 日</span>
+        </div>
+        <p class="col-sum">知识库明明有答案，检索就是召不回来。切片太大语义被稀释、没有重叠导致答案被切断、通用模型对中文技术文档不敏感——三个变量我都踩过一遍。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>
+    </ol>
+    <footer class="article-foot">
+      <div><a href="../../series/index.html">所有专栏</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
