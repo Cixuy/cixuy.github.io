@@ -38,7 +38,7 @@
 <main class="wrap">
   <article class="article column">
     <header class="article-head">
-      <p class="section-label">专栏 · 2 章</p>
+      <p class="section-label">专栏 · 3 章</p>
       <h1>缓存与并发</h1>
       
       <p class="col-start"><a href="../../posts/redis-logical-expire/index.html">从第一章开始读 →</a></p>
@@ -59,6 +59,14 @@
           <span class="col-date">2026 年 11 月 15 日</span>
         </div>
         <p class="col-sum">两个账号同时操作，一个看到了另一个的数据。本地怎么都复现不了，根因是 Tomcat 线程池复用线程时上一次的 ThreadLocal 没被清掉。</p>
+        <p class="col-meta">约 3 分钟</p>
+      </li>      <li class="col-item">
+        <div class="col-item-head">
+          <span class="ch-num">03</span>
+          <h3><a href="../../posts/redis-outage-fallback/index.html">Redis 整体不可用时的降级与限流：一次故障演练复盘</a></h3>
+          <span class="col-date">2026 年 11 月 19 日</span>
+        </div>
+        <p class="col-sum">缓存扛住的流量，在缓存挂掉的那一刻全部压到数据库上。不做降级和限流，Redis 重启的那两分钟就是整个系统下线的时间。</p>
         <p class="col-meta">约 3 分钟</p>
       </li>
     </ol>

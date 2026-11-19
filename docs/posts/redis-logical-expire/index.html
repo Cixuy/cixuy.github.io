@@ -43,14 +43,14 @@
         <span>创建 2026 年 11 月 12 日</span>
         <span>更新 2026 年 11 月 14 日</span>
         <span>约 4 分钟</span>
-        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（2 章）</a>
+        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（3 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#缓存">缓存</a><a class="tag" href="../../tags/index.html#并发">并发</a></span>
       </div>
     </header>
     <nav class="series-box">
       <p class="series-box-head"><a href="../../series/缓存与并发/index.html">缓存与并发</a>
-        <span>第 1 / 2 章</span></p>
-      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li></ol>
+        <span>第 1 / 3 章</span></p>
+      <ol class="chapter-list"><li class="cur"><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li><li><span class="ch-num">03</span><a href="../../posts/redis-outage-fallback/index.html">Redis 整体不可用时的降级与限流：一次故障演练复盘</a></li></ol>
     </nav>
     <div class="prose">
 <p>设备状态和权限字典在智慧工地项目里是被高频读的：大屏每几秒刷一次，每个接口都要查当前用户权限。这类数据变化不频繁，放进 Redis 很合适，问题是<strong>热点 key 过期的那一刻</strong>——如果几千个请求同时发现缓存没了，会一起打到 MySQL 上。</p>

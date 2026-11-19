@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redis 整体不可用时的降级与限流：一次故障演练复盘 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="Redis 整体不可用时的降级与限流：一次故障演练复盘 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>Redis 整体不可用时的降级与限流：一次故障演练复盘</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 19 日</span>
+        <span>更新 2026 年 11 月 19 日</span>
+        <span>约 3 分钟</span>
+        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（3 章）</a>
+        <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#降级">降级</a><a class="tag" href="../../tags/index.html#高可用">高可用</a></span>
+      </div>
+    </header>
+    <nav class="series-box">
+      <p class="series-box-head"><a href="../../series/缓存与并发/index.html">缓存与并发</a>
+        <span>第 3 / 3 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li><li class="cur"><span class="ch-num">03</span><a href="../../posts/redis-outage-fallback/index.html">Redis 整体不可用时的降级与限流：一次故障演练复盘</a></li></ol>
+    </nav>
+    <div class="prose">
+<p>做完缓存治理之后，我做了一次演练：直接把 Redis 进程 kill 掉，看系统会怎么样。</p>
+<p>结果是<strong>接口大面积超时，数据库连接池在 40 秒内被打满，然后整个服务不可用</strong>。Redis 挂了两分钟，系统崩了六分钟 —— 因为数据库被打到需要时间缓过来。</p>
+<p>这次演练之后我才意识到：<strong>缓存不只是提速，它同时承担了削峰</strong>。挂掉的时候，那部分流量不会消失，会原封不动地砸到数据库上。</p>
+<h2>三层防护</h2>
+<h3>第一层：连接超时必须短</h3>
+<p>默认的 Redis 客户端超时往往是秒级甚至无限。Redis 挂掉时，请求不是"快速失败"，而是"卡在那里等" —— 线程被占住，比报错更糟。</p>
+<pre><code class="language-yaml">spring:
+  data:
+    redis:
+      timeout: 500ms
+      connect-timeout: 200ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-wait: 200ms
+</code></pre>
+<p>三个数字的含义：连接 200ms 建不上就算失败、命令 500ms 没回就放弃、池子满了等 200ms 拿不到连接就抛异常。<strong>全部是"快速失败"的取向</strong>，宁可报错也不占线程。</p>
+<p>这一步改完再演练，接口从"卡死"变成了"快速报错"，但用户看到的是 500 —— 还得往下做。</p>
+<h3>第二层：降级 + 限流</h3>
+<p>降级很简单，就是 <code>try-catch</code> 后直接查库：</p>
+<pre><code class="language-java">public DeviceStatus getStatus(Long id) {
+    try {
+        DeviceStatus cached = redis.get(key(id));
+        if (cached != null) return cached;
+    } catch (Exception e) {
+        log.warn(&quot;redis unavailable, fallback to db, key={}&quot;, key(id), e);
+    }
+    return loadFromDb(id);
+}
+</code></pre>
+<p>但<strong>只做降级等于把数据库送上去挨打</strong>。缓存平时挡住的那 90% 流量现在全落下来，DB 必死。</p>
+<p>所以降级必须配限流。我用的是最简单的方案 —— 信号量控制同时打到 DB 的请求数：</p>
+<pre><code class="language-java">private final Semaphore dbPermit = new Semaphore(20);  // 按连接池大小定
+
+public DeviceStatus loadFromDb(Long id) {
+    if (!dbPermit.tryAcquire()) {
+        throw new ServiceBusyException(&quot;系统繁忙，请稍后重试&quot;);
+    }
+    try {
+        return mapper.selectById(id);
+    } finally {
+        dbPermit.release();
+    }
+}
+</code></pre>
+<p>多出来的请求直接返回"系统繁忙"，用户体验不好，但<strong>至少系统还活着</strong>。这比全站 500 好得多。</p>
+<p>限流阈值怎么定？看数据库连接池大小 —— 池子 20 个连接，信号量就给 15～18，留几个给非缓存路径的请求（写操作、定时任务）。</p>
+<h3>第三层：二级缓存兜底</h3>
+<p>Redis 整体不可用时，本地缓存能挡住一部分。我用 Caffeine 存了最热的几个字典（权限、设备类型），有效期 5 分钟。</p>
+<p>多层缓存有个必须处理的问题：<strong>一致性</strong>。本地缓存的更新是个麻烦事 —— 多实例部署时，A 机器改了数据，B 机器的本地缓存还是旧的。</p>
+<p>我的取舍是：本地缓存只放<strong>变化极少</strong>的数据（字典表、配置项），并且<strong>只在一级缓存不可用时才启用</strong>。正常状态下本地缓存不参与读路径，避免一致性问题；Redis 挂了它才顶上，这时候"数据可能旧 5 分钟"完全可以接受。</p>
+<h2>演练怎么做</h2>
+<p>改完之后要验证，方法是模拟真实故障，不是改配置。</p>
+<pre><code class="language-bash"># 方式一：直接杀掉 Redis（最真实）
+redis-cli shutdown nosave
+
+# 方式二：不断开连接但让命令超时（模拟网络问题）
+# Linux 上用 tc 加延迟，Windows 上可以直接停服务
+</code></pre>
+<p>然后观察三个指标：</p>
+<ol>
+<li><strong>接口响应时间</strong> —— 应该从"秒级卡死"变成"快速失败"</li>
+<li><strong>数据库连接池活跃数</strong> —— 不应该打满</li>
+<li><strong>错误率</strong> —— 会上升，但要可控，不能是 100%</li>
+</ol>
+<p>我第一轮演练的数据库连接池活跃数是 20/20（打满），第二轮降到 12/20 左右。这个数字是判断降级有没有生效最直接的依据。</p>
+<h2>一个反面教训</h2>
+<p>我一开始的做法是<strong>捕获所有异常后静默降级</strong>，日志只打 <code>debug</code> 级别。结果 Redis 挂了两小时没人发现 —— 系统看起来"正常"，只是慢了一点，数据库压力大了一点。</p>
+<p>后来加了三条告警：</p>
+<ul>
+<li>Redis 连接失败连续 10 次 → 告警</li>
+<li>降级路径被触发超过 100 次/分钟 → 告警</li>
+<li>数据库连接池活跃数 &gt; 80% 持续 1 分钟 → 告警</li>
+</ul>
+<p><strong>降级是为了让系统活着，不是为了掩盖故障。</strong> 这两件事很容易混在一起。</p>
+<h2>小结</h2>
+<p>缓存高可用这件事，思路和缓存击穿是相反的：</p>
+<ul>
+<li>击穿是<strong>个别 key</strong> 失效，要保证"有且只有一个请求去加载"</li>
+<li>整体不可用是<strong>所有 key</strong> 失效，要保证"大部分请求根本不去加载"</li>
+</ul>
+<p>前者靠锁，后者靠限流。两者的共同点是：<strong>都不能让流量原样穿透到数据库</strong>。</p>
+<p>最后留一个问题给自己：如果数据库也挂了呢？答案是没有答案 —— 到那一层只能靠多副本和主从切换，那是运维的事，不是代码能兜住的。所以降级的目标不是"永不宕机"，是<strong>把故障控制在 Redis 这一层，不要让数据库跟着倒</strong>。</p>
+    </div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/threadlocal-context-leak/index.html"><span>上一章</span>ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></div>
+    <footer class="article-foot">
+      <div><a href="../../posts/rag-chunking-tuning/index.html">← RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

@@ -43,14 +43,14 @@
         <span>创建 2026 年 11 月 15 日</span>
         <span>更新 2026 年 11 月 15 日</span>
         <span>约 3 分钟</span>
-        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（2 章）</a>
+        <a class="tag tag-series" href="../../series/缓存与并发/index.html">专栏 · 缓存与并发（3 章）</a>
         <span class="tags"><a class="tag" href="../../tags/index.html#java">Java</a><a class="tag" href="../../tags/index.html#并发">并发</a><a class="tag" href="../../tags/index.html#threadlocal">ThreadLocal</a></span>
       </div>
     </header>
     <nav class="series-box">
       <p class="series-box-head"><a href="../../series/缓存与并发/index.html">缓存与并发</a>
-        <span>第 2 / 2 章</span></p>
-      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li class="cur"><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li></ol>
+        <span>第 2 / 3 章</span></p>
+      <ol class="chapter-list"><li><span class="ch-num">01</span><a href="../../posts/redis-logical-expire/index.html">缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></li><li class="cur"><span class="ch-num">02</span><a href="../../posts/threadlocal-context-leak/index.html">ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</a></li><li><span class="ch-num">03</span><a href="../../posts/redis-outage-fallback/index.html">Redis 整体不可用时的降级与限流：一次故障演练复盘</a></li></ol>
     </nav>
     <div class="prose">
 <p>这个问题是我在给权限模块加上下文透传之后出现的，表现非常吓人：测试同事用 A 账号登录，刷新列表页，有几行数据显示的是 B 账号的信息。</p>
@@ -136,7 +136,7 @@ public void afterCompletion(HttpServletRequest req, HttpServletResponse resp,
 </ol>
 <p>最后一句经验：这类"偶发串号"的问题，只要能构造出多线程交替执行的环境，就一定能稳定复现。别在单线程的本地环境里跟自己较劲。</p>
     </div>
-    <div class="chapter-nav"><a class="ch-prev" href="../../posts/redis-logical-expire/index.html"><span>上一章</span>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a></div>
+    <div class="chapter-nav"><a class="ch-prev" href="../../posts/redis-logical-expire/index.html"><span>上一章</span>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</a><a class="ch-next" href="../../posts/redis-outage-fallback/index.html"><span>下一章</span>Redis 整体不可用时的降级与限流：一次故障演练复盘</a></div>
     <footer class="article-foot">
       <div><a href="../../posts/agent-tool-degradation/index.html">← 工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</a> <a href="../../posts/mysql-sharding-pagination/index.html">下一篇：MySQL 分表后的分页与聚合：跨表查询的三种处理方式 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
