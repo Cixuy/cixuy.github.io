@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 18 Nov 2026 23:24:25 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 19 Nov 2026 02:09:18 +0800</lastBuildDate>
     <item>
+      <title>Redis 整体不可用时的降级与限流：一次故障演练复盘</title>
+      <link>https://cixuy.github.io/posts/redis-outage-fallback/index.html</link>
+      <guid>https://cixuy.github.io/posts/redis-outage-fallback/index.html</guid>
+      <description>缓存扛住的流量，在缓存挂掉的那一刻全部压到数据库上。不做降级和限流，Redis 重启的那两分钟就是整个系统下线的时间。</description>
+    </item>    <item>
       <title>RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</title>
       <link>https://cixuy.github.io/posts/rag-chunking-tuning/index.html</link>
       <guid>https://cixuy.github.io/posts/rag-chunking-tuning/index.html</guid>
