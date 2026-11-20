@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 20 日</span>
+        <span>更新 2026 年 11 月 20 日</span>
+        <span>约 4 分钟</span>
+        
+        <span class="tags"><a class="tag" href="../../tags/index.html#mysql">MySQL</a><a class="tag" href="../../tags/index.html#innodb">InnoDB</a><a class="tag" href="../../tags/index.html#mvcc">MVCC</a><a class="tag" href="../../tags/index.html#事务">事务</a></span>
+      </div>
+    </header>
+
+    <div class="prose">
+<p>同一个事务里查两次，结果一样，但中间另一个事务明明已经提交了——这件事在 MySQL 里叫可重复读，实现它的机制叫 MVCC（多版本并发控制）。</p>
+<p>大多数人能背出「MVCC 靠 undo log 和 Read View 实现」，但真被追问「Read View 里有什么」「RC 和 RR 差在哪一行代码」的时候会卡住。这篇按一条 <code>SELECT</code> 的执行路径走一遍。</p>
+<h2>一行数据其实有三个隐藏列</h2>
+<p>建表时只写了业务字段，InnoDB 在行上还偷偷加了三个：</p>
+<table>
+<thead>
+<tr>
+<th>隐藏列</th>
+<th>长度</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DB_TRX_ID</code></td>
+<td>6 字节</td>
+<td>最后一次修改这行的事务 ID</td>
+</tr>
+<tr>
+<td><code>DB_ROLL_PTR</code></td>
+<td>7 字节</td>
+<td>指向 undo log 里这行的上一个版本</td>
+</tr>
+<tr>
+<td><code>DB_ROW_ID</code></td>
+<td>6 字节</td>
+<td>没有主键时用，有主键就不需要</td>
+</tr>
+</tbody>
+</table>
+<p>关键在 <code>DB_ROLL_PTR</code>：每次更新不是原地改，而是把旧值写进 undo log，然后让新版本的 <code>roll_ptr</code> 指向旧版本。于是同一行数据变成一条<strong>版本链</strong>：</p>
+<pre><code>当前行(trx_id=105) ──roll_ptr──▶ undo(trx_id=101) ──roll_ptr──▶ undo(trx_id=98) ──▶ null
+</code></pre>
+<p>一条 <code>SELECT</code> 想读到「应该看见的那个版本」，就得沿着这条链往回走，直到找到一个对当前事务可见的 <code>trx_id</code>。</p>
+<h2>Read View 里到底有四个什么</h2>
+<p>判断可见性靠的不只是自己的事务 ID，而是一个快照结构：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m_ids</code></td>
+<td>生成快照那一刻，<strong>所有活跃（未提交）事务</strong>的 ID 列表</td>
+</tr>
+<tr>
+<td><code>min_trx_id</code></td>
+<td><code>m_ids</code> 里的最小值</td>
+</tr>
+<tr>
+<td><code>max_trx_id</code></td>
+<td>系统下一个要分配的事务 ID（注意不是 <code>m_ids</code> 最大值 + 1）</td>
+</tr>
+<tr>
+<td><code>creator_trx_id</code></td>
+<td>创建这个快照的事务自己</td>
+</tr>
+</tbody>
+</table>
+<p>可见性判断就是四句话：</p>
+<ol>
+<li><code>trx_id == creator_trx_id</code> → 自己改的，可见</li>
+<li><code>trx_id &lt; min_trx_id</code> → 这事务在我快照之前就提交完了，可见</li>
+<li><code>trx_id &gt;= max_trx_id</code> → 这事务在我快照之后才开始，不可见</li>
+<li>落在中间 → 看它在不在 <code>m_ids</code> 里：在（当时还活着）→ 不可见；不在（当时已提交）→ 可见</li>
+</ol>
+<p>不可见就顺着 <code>roll_ptr</code> 往回找下一个版本，重复上面四步，直到找到可见版本或者链走完。</p>
+<h2>RC 和 RR 只差一行</h2>
+<p>两个隔离级别用的是同一套版本链和同一套判断逻辑，唯一的区别是<strong>Read View 什么时候生成</strong>：</p>
+<ul>
+<li><strong>读已提交（RC）</strong>：每条 <code>SELECT</code> 都生成一个新的 Read View</li>
+<li><strong>可重复读（RR）</strong>：只在事务里<strong>第一次快照读</strong>时生成，之后整个事务复用这一个</li>
+</ul>
+<p>所以 RR 下你看到的是「第一次查询那一刻」的世界，而不是「BEGIN 那一刻」的世界。这个细节很容易错：</p>
+<pre><code class="language-sql">-- 事务 A
+BEGIN;
+SELECT * FROM t WHERE id = 1;   -- 这一刻生成 Read View，假设读到 v1
+-- （事务 B 更新并提交）
+SELECT * FROM t WHERE id = 1;   -- 还是 v1，因为复用同一个 Read View
+COMMIT;
+</code></pre>
+<p>如果把中间那条 <code>SELECT</code> 去掉，事务 A 直接 B 更新后再查，读到的是<strong>新值</strong>——因为 Read View 是在后面那次查询才生成的。很多「RR 好像没生效」的疑惑都是这个原因：快照不是跟着 <code>BEGIN</code> 走的。</p>
+<h2>快照读和当前读是两套逻辑</h2>
+<p>MVCC 只服务于<strong>快照读</strong>，也就是普通的 <code>SELECT</code>。下面这些是<strong>当前读</strong>，一律读最新已提交版本，并且加锁：</p>
+<pre><code class="language-sql">SELECT ... FOR UPDATE;        -- 加排他锁
+SELECT ... LOCK IN SHARE MODE; -- 加共享锁
+UPDATE / DELETE / INSERT;     -- 天然是当前读
+</code></pre>
+<p>这也解释了幻读为什么有两种表现：</p>
+<ul>
+<li>快照读下，MVCC 让你看不见别人新插入的行，所以「幻读」被规避了</li>
+<li>当前读下（比如 <code>FOR UPDATE</code> 范围查），必须靠 <strong>next-key lock</strong>（记录锁 + 间隙锁）阻止别人往间隙里插，否则同一事务两次当前读会多出行来</li>
+</ul>
+<p>所以「RR 能防幻读」这句话要加限定：<strong>快照读靠 MVCC，当前读靠间隙锁</strong>。少了后半句，遇到 <code>FOR UPDATE</code> 就会翻车。</p>
+<h2>三个实际踩过的坑</h2>
+<p><strong>一、长事务会让 undo 一直涨。</strong>
+版本链上的旧版本什么时候能删？当没有任何 Read View 还需要它的时候。一个开了十分钟没提交的事务，会让这十分钟内所有被改过的行的旧版本都留着，undo 表空间暴涨，同时所有查询都要走更长的版本链。线上看到 undo 持续增长，先查 <code>information_schema.innodb_trx</code> 里的长事务。</p>
+<p><strong>二、<code>SELECT ... FOR UPDATE</code> 在 RR 下锁的范围比想象大。</strong>
+RR 下没有索引的更新会锁全表（更准确说是锁所有扫描到的行加间隙），一条 <code>UPDATE t SET x=1 WHERE name='a'</code>（name 无索引）能把整张表锁住。这不是 MVCC 的问题，是当前读加锁的问题，但现象常常混在一起。</p>
+<p><strong>三、MVCC 不解决写写冲突。</strong>
+两个事务同时 <code>UPDATE</code> 同一行，后到的那个会阻塞等锁，等前一个提交后它读到的是<strong>最新版本</strong>再改（这叫当前读），不存在「基于旧版本覆盖」的情况。所以「MVCC 让读写不阻塞」是对的，「MVCC 让写写不阻塞」是错的。</p>
+<h2>小结</h2>
+<p>一条 <code>SELECT</code> 在 RR 下的完整路径是：</p>
+<ol>
+<li>用本事务第一次快照读时生成的 Read View 作为判据</li>
+<li>拿到行上最新的 <code>DB_TRX_ID</code>，按四个字段判断可见性</li>
+<li>不可见就沿 <code>DB_ROLL_PTR</code> 回溯 undo 版本链，直到找到可见版本</li>
+<li>如果语句是当前读（<code>FOR UPDATE</code> / 更新删除），跳过 MVCC 直接读最新版本并加锁</li>
+</ol>
+<p>记住两句话就够了：<strong>RR 的快照在第一次读时生成，不在 BEGIN 时</strong>；<strong>MVCC 只管快照读，写写冲突和当前读还得靠锁</strong>。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/redis-outage-fallback/index.html">← Redis 整体不可用时的降级与限流：一次故障演练复盘</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
