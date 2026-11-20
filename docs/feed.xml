@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 19 Nov 2026 02:09:18 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 20 Nov 2026 08:46:22 +0800</lastBuildDate>
     <item>
+      <title>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</title>
+      <link>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</link>
+      <guid>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</guid>
+      <description>从隐藏列、undo 版本链到 Read View 的四个字段，把「为什么我读到的是旧数据」「为什么另一个事务提交了我还看不见」讲成一条可以走通的路径。</description>
+    </item>    <item>
       <title>Redis 整体不可用时的降级与限流：一次故障演练复盘</title>
       <link>https://cixuy.github.io/posts/redis-outage-fallback/index.html</link>
       <guid>https://cixuy.github.io/posts/redis-outage-fallback/index.html</guid>
