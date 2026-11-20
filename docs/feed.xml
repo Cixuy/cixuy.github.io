@@ -5,7 +5,7 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 20 Nov 2026 08:46:22 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 20 Nov 2026 02:00:10 +0800</lastBuildDate>
     <item>
       <title>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</title>
       <link>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</link>
