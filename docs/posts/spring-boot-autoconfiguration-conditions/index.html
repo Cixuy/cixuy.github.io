@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 21 日</span>
+        <span>更新 2026 年 11 月 21 日</span>
+        <span>约 3 分钟</span>
+        
+        <span class="tags"><a class="tag" href="../../tags/index.html#spring-boot">Spring Boot</a><a class="tag" href="../../tags/index.html#自动配置">自动配置</a><a class="tag" href="../../tags/index.html#bean">Bean</a><a class="tag" href="../../tags/index.html#java">Java</a></span>
+      </div>
+    </header>
+
+    <div class="prose">
+<p>引入 <code>spring-boot-starter-web</code>，不用写一行配置就能跑起一个 Tomcat；自己写个 <code>DataSource</code> Bean 又不想要自动配置的那个——这些「自动」背后是一套条件装配机制。不理解它，遇到「我的 Bean 没生效」「两个 Bean 冲突了」就只能靠试。</p>
+<h2>@SpringBootApplication 是三个注解的合体</h2>
+<pre><code class="language-java">@SpringBootConfiguration      // 本质是 @Configuration
+@EnableAutoConfiguration      // 关键：开启自动配置
+@ComponentScan                // 扫当前包及子包
+public @interface SpringBootApplication {}
+</code></pre>
+<p><code>@ComponentScan</code> 只负责扫你自己写的组件，<code>@EnableAutoConfiguration</code> 才是「把别人 jar 里的配置也装进来」的开关。它通过 <code>@Import(AutoConfigurationImportSelector.class)</code> 触发。</p>
+<h2>自动配置类是从哪读出来的</h2>
+<p><code>AutoConfigurationImportSelector</code> 做的事就一件：找出所有候选自动配置类，然后按条件筛。</p>
+<ul>
+<li><strong>Spring Boot 2.x</strong>：读所有 jar 里的 <code>META-INF/spring.factories</code>，取 <code>EnableAutoConfiguration</code> 这个 key</li>
+<li><strong>Spring Boot 3.x</strong>：改读 <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>，一行一个类名</li>
+</ul>
+<p>文件内容长这样（以 MyBatis 起步依赖为例）：</p>
+<pre><code class="language-text">org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration
+org.mybatis.spring.boot.autoconfigure.MybatisLanguageDriverAutoConfiguration
+</code></pre>
+<p>注意这里只是<strong>候选清单</strong>。清单上的类不是全都会被注册，每个类上面都挂着一串条件注解，条件不满足就整个跳过——而且是<strong>静默跳过</strong>，不报错。这就是为什么「加了依赖但没生效」时日志里什么都看不到。</p>
+<h2>条件注解的家族</h2>
+<table>
+<thead>
+<tr>
+<th>注解</th>
+<th>判断什么</th>
+<th>典型用法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>@ConditionalOnClass</code></td>
+<td>类路径上有没有某个类</td>
+<td>有 <code>DataSource</code> 才装配数据源</td>
+</tr>
+<tr>
+<td><code>@ConditionalOnMissingBean</code></td>
+<td>容器里<strong>还没有</strong>某类型的 Bean</td>
+<td>让你自己的 Bean 覆盖默认实现</td>
+</tr>
+<tr>
+<td><code>@ConditionalOnProperty</code></td>
+<td>配置项是否为某个值</td>
+<td><code>spring.datasource.enabled=true</code> 才开</td>
+</tr>
+<tr>
+<td><code>@ConditionalOnWebApplication</code></td>
+<td>是不是 Web 环境</td>
+<td>Servlet 相关配置只在 Web 应用生效</td>
+</tr>
+<tr>
+<td><code>@ConditionalOnBean</code></td>
+<td>容器里<strong>已经有</strong>某个 Bean</td>
+<td>依赖别的配置先装配</td>
+</tr>
+</tbody>
+</table>
+<p>前两个最常用，也最容易混：<code>OnClass</code> 看的是 classpath（编译期），<code>OnBean</code> 看的是容器（运行期，而且有顺序依赖）。</p>
+<h2>装配顺序：为什么你的 Bean 能覆盖默认的</h2>
+<p><code>@ConditionalOnMissingBean</code> 能不能生效，取决于<strong>用户配置类和自动配置类谁先被处理</strong>。</p>
+<p>Spring Boot 的做法是把自动配置类当作 <strong>deferred import</strong>（延迟导入），在所有用户自己的 <code>@Configuration</code> 处理完之后再解析。于是顺序是：</p>
+<pre><code>用户配置类（@ComponentScan 扫到的、你自己写的） → 自动配置类
+</code></pre>
+<p>所以你在自己类里定义的 <code>DataSource</code> 先注册进容器，自动配置那个 <code>@ConditionalOnMissingBean(DataSource.class)</code> 一看已经有了，就跳过。这就是「自定义 Bean 能覆盖默认实现」的原理——<strong>靠的不是优先级高，而是处理得早</strong>。</p>
+<p>反过来说，如果两个都是自动配置，就要显式声明相对顺序：</p>
+<pre><code class="language-java">@AutoConfiguration(before = DataSourceAutoConfiguration.class)
+@AutoConfigureAfter(MybatisAutoConfiguration.class)
+</code></pre>
+<p><code>@AutoConfigureOrder</code> 也能用，但数字只对同批次生效，不如 <code>before/after</code> 直观。</p>
+<h2>排查「为什么没生效」</h2>
+<p>Spring Boot 内置了条件评估报告，两种打开方式：</p>
+<pre><code class="language-bash">java -jar app.jar --debug
+# 或者在 application.yml 里
+logging:
+  level:
+    org.springframework.boot.autoconfigure: DEBUG
+</code></pre>
+<p>输出里会有三段，最有用的是 <strong>Negative matches</strong>：</p>
+<pre><code class="language-text">Negative matches:
+---------------
+   DataSourceAutoConfiguration:
+      Did not match:
+         - @ConditionalOnClass did not find required class 'javax.sql.DataSource'
+</code></pre>
+<p>这段直接告诉你「这个配置被跳过了，因为哪个条件不满足」，比猜快得多。</p>
+<h2>三个常见坑</h2>
+<p><strong>一、<code>@ConditionalOnClass</code> 写错类名，编译不报错但永远不生效。</strong>
+注解里的 <code>name</code> 是字符串时不会做编译期校验，类名写错就静默失败。能用 <code>value = Xxx.class</code> 就别用 <code>name = "..."</code>。</p>
+<p><strong>二、自定义配置类写在启动类所在包的</strong>外面<strong>，<code>@ComponentScan</code> 扫不到。</strong>
+自动配置和你自己的配置都失效时，先确认包路径。启动类默认扫它所在包及子包。</p>
+<p><strong>三、<code>@ConditionalOnProperty</code> 配了 <code>havingValue</code> 但类型对不上。</strong>
+<code>havingValue = "true"</code> 只匹配字符串 <code>true</code>，配成 <code>TRUE</code> 或 <code>1</code> 都不算。要么统一写小写 <code>true</code>，要么用 <code>matchIfMissing</code> 显式表达默认行为。</p>
+<h2>小结</h2>
+<p>自动配置不是「魔法」，就三步：</p>
+<ol>
+<li><strong>收集</strong>：从所有 jar 的 <code>AutoConfiguration.imports</code>（3.x）里读出候选类</li>
+<li><strong>排序</strong>：按 <code>@AutoConfigureBefore/After</code> 排出相对顺序</li>
+<li><strong>筛选</strong>：逐个评估条件注解，不满足就跳过；因为自动配置是延迟导入，用户自己的 Bean 总是先注册，<code>@ConditionalOnMissingBean</code> 才能实现「覆盖默认」</li>
+</ol>
+<p>搞不清某个配置为什么在/不在，别猜，开 <code>--debug</code> 看条件评估报告——它把「为什么不匹配」写得很清楚。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/innodb-mvcc-read-view/index.html">← InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
