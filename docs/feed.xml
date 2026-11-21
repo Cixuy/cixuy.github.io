@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 20 Nov 2026 02:00:10 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 21 Nov 2026 02:03:39 +0800</lastBuildDate>
     <item>
+      <title>Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean</title>
+      <link>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</link>
+      <guid>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</guid>
+      <description>从 @SpringBootApplication 的三件套，到 AutoConfiguration.imports 的加载顺序，再到 @ConditionalOnMissingBean 为什么有时不生效——把自动配置的装配过程拆开看。</description>
+    </item>    <item>
       <title>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</title>
       <link>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</link>
       <guid>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</guid>
