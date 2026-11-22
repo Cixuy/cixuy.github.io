@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 22 日</span>
+        <span>更新 2026 年 11 月 22 日</span>
+        <span>约 3 分钟</span>
+        
+        <span class="tags"><a class="tag" href="../../tags/index.html#redis">Redis</a><a class="tag" href="../../tags/index.html#epoll">epoll</a><a class="tag" href="../../tags/index.html#单线程">单线程</a><a class="tag" href="../../tags/index.html#性能">性能</a></span>
+      </div>
+    </header>
+
+    <div class="prose">
+<p>「Redis 是单线程的」这句话只对了一半：处理命令是单线程，但网络读写、持久化、集群通信都有别的线程。搞不清这个边界，就会出现「我用了 6.0 的 io-threads，怎么还是被一个大 key 卡住」的疑问。</p>
+<h2>一条 GET 的完整路径</h2>
+<p>客户端发来 <code>GET user:1</code>，服务端经历的步骤是：</p>
+<pre><code>epoll_wait 返回可读事件
+   ↓
+读 socket，解析 RESP 协议（*2\r\n$3\r\nGET\r\n$6\r\nuser:1\r\n）
+   ↓
+按命令名查命令表，拿到 redisCommand 和参数个数
+   ↓
+校验参数、权限、内存上限、是否处于阻塞状态
+   ↓
+调用 getCommand：在 dict 里查 key，命中就返回 robj
+   ↓
+写回 socket（先塞进输出缓冲区，由事件循环负责写出去）
+</code></pre>
+<p>这整段除了<strong>读写 socket</strong>，都在同一个主线程里串行完成。所以「单线程」准确的说法是：<strong>命令的执行是串行的，一条命令执行期间，别的命令连解析的机会都没有</strong>。</p>
+<h2>为什么单线程还能快</h2>
+<p>三个原因，按重要性排：</p>
+<ol>
+<li><strong>全内存操作</strong>：一次 hash 查找是 O(1)，耗时在几十纳秒量级，瓶颈根本不在 CPU</li>
+<li><strong>无锁无竞争</strong>：不需要加锁，也就没有锁开销和上下文切换</li>
+<li><strong>IO 多路复用</strong>：一个线程用 epoll 同时盯着上万个连接，不需要每连接一线程</li>
+</ol>
+<p>瓶颈在网络和内存带宽，不在计算。所以「多线程能更快」这个直觉在 Redis 上不成立——加线程反而要处理并发访问共享数据结构的锁。</p>
+<h2>事件循环长什么样</h2>
+<p><code>aeEventLoop</code> 一轮循环做三件事：</p>
+<pre><code class="language-c">while (!stop) {
+    // 1. 计算距离下一个定时任务还有多久，作为 epoll_wait 的超时
+    timeout = 最近的时间事件 - now;
+    // 2. 等文件事件（客户端可读/可写）
+    numevents = epoll_wait(epfd, events, maxevents, timeout);
+    // 3. 处理文件事件：读命令、执行、写回复
+    for (i = 0; i &lt; numevents; i++) handleFileEvent(events[i]);
+    // 4. 处理时间事件：serverCron（过期清理、持久化触发、集群心跳等）
+    processTimeEvents();
+}
+</code></pre>
+<p>注意第 1 步：<strong>超时时间由最近的时间事件决定</strong>。如果有个定时任务 100ms 后要跑，<code>epoll_wait</code> 最多等 100ms 就得回来。这也是为什么单线程的 Redis 仍然能定期做后台任务——它不是靠别的线程，而是靠「等 IO 的时候顺便看时间」。</p>
+<h2>6.0 的 IO 多线程分担了什么</h2>
+<p>配置长这样：</p>
+<pre><code class="language-conf">io-threads 4
+io-threads-do-reads yes
+</code></pre>
+<p>它只做两件事：<strong>读 socket + 解析协议</strong>、<strong>写 socket</strong>。命令的<strong>执行</strong>依然在主线程串行。</p>
+<p>流程变成：</p>
+<pre><code>多个 IO 线程并行读 + 解析 → 主线程串行执行所有命令 → 多个 IO 线程并行写回
+</code></pre>
+<p>所以 io-threads 的效果取决于「单条命令是否够小、并发是否够高」：命令都很轻时，瓶颈在网络 IO，加线程有效；一旦有慢命令（大 key、<code>KEYS</code>、复杂 Lua），主线程照样被卡，加多少 IO 线程都没用。</p>
+<h2>哪些操作会卡住整个实例</h2>
+<p>这是最该记住的部分。以下操作<strong>在主线程里同步完成</strong>，执行期间所有其他请求排队：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>为什么慢</th>
+<th>替代方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KEYS *</code></td>
+<td>全库遍历，O(N)</td>
+<td><code>SCAN</code> 游标分批</td>
+</tr>
+<tr>
+<td><code>DEL</code> 大集合</td>
+<td>逐个释放元素内存，O(N)</td>
+<td><code>UNLINK</code>（异步释放）</td>
+</tr>
+<tr>
+<td><code>FLUSHALL</code> / <code>FLUSHDB</code></td>
+<td>同上，还带同步</td>
+<td>加 <code>ASYNC</code> 参数</td>
+</tr>
+<tr>
+<td><code>HGETALL</code> 大 hash</td>
+<td>一次性构造回复，内存翻倍</td>
+<td><code>HSCAN</code> 分批</td>
+</tr>
+<tr>
+<td>复杂 Lua 脚本</td>
+<td>整个脚本原子执行</td>
+<td>拆分，控制执行时间</td>
+</tr>
+</tbody>
+</table>
+<p>还有一个容易被忽略的：<strong>大 key 的序列化</strong>。一个有 100 万元素的 zset，即使只做 <code>ZRANGE key 0 9</code>，命令本身不慢，但如果这个 key 正好在做 RDB 持久化或主从全量同步，fork 出来的子进程要复制页表，主线程也可能被拖慢。</p>
+<h2>慢查询日志不记录排队时间</h2>
+<p><code>SLOWLOG</code> 记录的是<strong>命令执行时间</strong>，不含网络排队、不含等前一条命令执行完的时间。所以出现「客户端感觉慢，但慢日志里什么都没有」时，八成是这两类原因：</p>
+<ol>
+<li>前面有慢命令在排队（看 <code>LATENCY</code> 和 <code>INFO commandstats</code>）</li>
+<li>网络往返或客户端连接池打满</li>
+</ol>
+<p>排查顺序建议是：先看 <code>INFO latencystats</code> 有没有异常高的命令，再看 <code>SLOWLOG GET 10</code>，最后才怀疑网络。</p>
+<h2>小结</h2>
+<ul>
+<li>单线程指的是<strong>命令执行串行</strong>，读写 socket 在 6.0 之后可以多线程</li>
+<li>快的原因是内存操作 + 无锁 + IO 多路复用，不是「单线程更快」</li>
+<li>事件循环的超时由最近的定时任务决定，所以单线程也能跑后台任务</li>
+<li>卡顿几乎都来自 O(N) 命令和大 key，<code>io-threads</code> 救不了这类问题</li>
+<li>慢日志不含排队时间，客户端变慢时先怀疑前面有慢命令</li>
+</ul>
+<p>判断一个操作会不会阻塞，只需要问一句：<strong>它是 O(1) 还是 O(N)？</strong> O(N) 的命令在数据量大时一定要换成分批版本。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/spring-boot-autoconfiguration-conditions/index.html">← Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

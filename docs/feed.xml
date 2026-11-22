@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 21 Nov 2026 02:03:39 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 22 Nov 2026 01:59:09 +0800</lastBuildDate>
     <item>
+      <title>Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径</title>
+      <link>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</link>
+      <guid>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</guid>
+      <description>单线程为什么还能这么快、6.0 的 IO 多线程到底分担了什么、哪些命令会把整个实例卡住——按一条 GET 的执行顺序走一遍。</description>
+    </item>    <item>
       <title>Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean</title>
       <link>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</link>
       <guid>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</guid>
