@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="Go 的 GMP 调度：goroutine 阻塞时 P 去哪了 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 23 日</span>
+        <span>更新 2026 年 11 月 23 日</span>
+        <span>约 3 分钟</span>
+        
+        <span class="tags"><a class="tag" href="../../tags/index.html#go">Go</a><a class="tag" href="../../tags/index.html#gmp">GMP</a><a class="tag" href="../../tags/index.html#调度器">调度器</a><a class="tag" href="../../tags/index.html#并发">并发</a></span>
+      </div>
+    </header>
+
+    <div class="prose">
+<p><code>go func(){}</code> 写起来像不要钱，十万个 goroutine 也就吃几百兆。这件事能成立，靠的是 Go 运行时自己实现了一套用户态调度器（GMP），而不是每个 goroutine 对应一个系统线程。</p>
+<h2>三个角色</h2>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>是什么</th>
+<th>数量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G</strong></td>
+<td>goroutine，携带栈、状态、指令位置</td>
+<td>无上限（受内存限制）</td>
+</tr>
+<tr>
+<td><strong>M</strong></td>
+<td>machine，真正的 OS 线程</td>
+<td>按需创建，默认上限 10000</td>
+</tr>
+<tr>
+<td><strong>P</strong></td>
+<td>processor，调度上下文，持有本地队列</td>
+<td>等于 <code>GOMAXPROCS</code>（默认 = CPU 核数）</td>
+</tr>
+</tbody>
+</table>
+<p>关键约束：<strong>M 必须绑定一个 P 才能执行 G</strong>。P 的数量固定，所以同一时刻最多有 <code>GOMAXPROCS</code> 个 goroutine 在真正并行跑——这是 Go 层面的并发度上限，和线程数无关。</p>
+<pre><code>P0 ── 本地队列 [G1 G2 G3] ── 绑定 ── M0 ── 内核线程
+P1 ── 本地队列 [G4 G5]     ── 绑定 ── M1
+P2 ── 本地队列 []          ── 空闲，去别的 P 偷
+        全局队列 [G6 G7 ...]   （满了或偷不到时用）
+</code></pre>
+<h2>本地队列与 work stealing</h2>
+<p>每个 P 有一个容量 256 的本地队列，<code>go f()</code> 创建的新 G 优先放当前 P 的本地队列（无锁，快）。</p>
+<p>本地队列空了怎么办？按顺序找：</p>
+<ol>
+<li>全局队列取一批</li>
+<li><strong>从别的 P 的本地队列偷一半</strong>（work stealing，偷数量的一半而不是一个，减少偷的频率）</li>
+<li>netpoller 里有没有 IO 就绪的 G</li>
+<li>都没有就休眠，等被唤醒</li>
+</ol>
+<p>偷一半而不是偷一个，是为了让偷来的活够跑一阵，避免频繁跨 P 同步。这个细节决定了高并发下调度器的实际吞吐。</p>
+<h2>阻塞系统调用：P 会被让出去</h2>
+<p>这是 GMP 最关键的设计。假设 G1 在 M0 上执行 <code>read()</code> 阻塞了：</p>
+<pre><code>进入 syscall 前：M0 ── 绑定 ── P0 ── 跑 G1
+阻塞后：        M0 ── 带着 G1 一起阻塞
+                P0 被 handoff 给 M2（或其他空闲 M）
+                M2 ── 绑定 ── P0 ── 继续跑队列里的 G2、G3
+</code></pre>
+<p>也就是说，<strong>阻塞的是 M，不是 P</strong>。P 会被转交给别的 M，队列里的其他 G 继续跑。等 syscall 返回，M0 带着 G1 回来，发现 P0 已经有了新主人，就把 G1 放进某个队列，自己休眠或退出。</p>
+<p>这就是「goroutine 阻塞不拖累别人」的机制来源——代价是线程数会临时上升。</p>
+<p>对比一下：如果每个 goroutine 绑一个线程，1 万个阻塞调用就要 1 万个线程，光栈就吃掉几十 G 虚拟内存，切换开销也顶不住。</p>
+<h2>网络 IO 不阻塞线程：netpoller</h2>
+<p><code>read()</code> 阻塞要 handoff，那网络 IO 岂不是每次都要多一个线程？不是。</p>
+<p>Go 把所有网络 fd 都设成<strong>非阻塞</strong>，注册到运行时的 netpoller（Linux 上就是 epoll）。发起读时：</p>
+<pre><code>G 发起 Read → 内核返回 EAGAIN（没数据）
+   ↓
+G 被 gopark 挂起，标记为等待该 fd
+   ↓
+M 立刻返回调度循环，继续跑别的 G（线程一点没浪费）
+   ↓
+epoll 报告 fd 可读 → netpoller 唤醒对应 G，放回队列
+</code></pre>
+<p>所以网络 IO 密集的服务，几万个连接可能只用了几个线程。这也是 Go 写网关/长连接服务舒服的原因——不用自己管 epoll，写同步代码就行。</p>
+<h2>抢占：1.14 才真正解决</h2>
+<p>早期 Go 是<strong>协作式抢占</strong>：只在函数调用检查点（栈增长检查）看要不要让出。如果一个 goroutine 写了死循环且没有函数调用：</p>
+<pre><code class="language-go">for {
+    // 纯计算，没有函数调用
+}
+</code></pre>
+<p>它会一直占着 P，其他 goroutine 饿死，调度器拿它没办法。</p>
+<p>1.14 之后改成<strong>基于信号的异步抢占</strong>：sysmon 线程发现某个 G 跑太久（默认 10ms），给它所在的 M 发 <code>SIGURG</code>，信号处理函数里挂起 G 让出 P。这才是真正意义上的抢占。</p>
+<p>sysmon 还负责：回收长时间阻塞的 P、触发 GC、清理 netpoller 里的超时。它是一个独立的 M，不需要 P 就能跑。</p>
+<h2>三个常见误解</h2>
+<p><strong>一、<code>GOMAXPROCS</code> 不是线程数。</strong>
+它是 P 的数量，也就是并行执行 G 的上限。实际线程数（M）可能远大于它，因为阻塞 syscall 会临时创建新 M。</p>
+<p><strong>二、goroutine 不是协程池。</strong>
+没有复用概念，每个 <code>go</code> 都是一个新 G（栈初始 2KB，按需增长）。G 结束就被回收，不存在「从池里借一个」。</p>
+<p><strong>三、channel 阻塞不会忙等。</strong>
+<code>ch &lt;- v</code> 阻塞时，G 被挂到 channel 的等待队列并 <code>gopark</code>，P 立刻去跑别的 G，不做任何自旋。所以「channel 慢」通常不是调度问题，是锁竞争或缓冲区大小不合适。</p>
+<h2>小结</h2>
+<ul>
+<li><strong>P 决定并行度</strong>，数量 = <code>GOMAXPROCS</code>，M 必须有 P 才能跑 G</li>
+<li><strong>本地队列 + work stealing</strong>：新 G 进本地队列，空闲 P 偷一半</li>
+<li><strong>阻塞 syscall 会 handoff P</strong>，阻塞的是 M，队列继续被别的 M 消费</li>
+<li><strong>网络 IO 走 netpoller</strong>，G 挂起而非线程阻塞，所以几万连接只要几个线程</li>
+<li><strong>1.14 起有异步抢占</strong>，纯计算死循环也能被切走</li>
+</ul>
+<p>理解这三者关系的价值在于：遇到「CPU 没满但 QPS 上不去」「线程数暴涨」这类问题，能判断到底是 P 不够、还是 M 被阻塞拖住了。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/redis-single-thread-command-path/index.html">← Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>

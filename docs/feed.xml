@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 22 Nov 2026 01:59:09 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 23 Nov 2026 09:06:15 +0800</lastBuildDate>
     <item>
+      <title>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</title>
+      <link>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</link>
+      <guid>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</guid>
+      <description>G、M、P 三者的关系，本地队列与 work stealing，系统调用时 P 的 handoff，以及 netpoller 怎么让网络 IO 不占线程——把「开十万个 goroutine 为什么不炸」讲清楚。</description>
+    </item>    <item>
       <title>Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径</title>
       <link>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</link>
       <guid>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</guid>
