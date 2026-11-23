@@ -5,7 +5,7 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 23 Nov 2026 09:06:15 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 23 Nov 2026 02:09:11 +0800</lastBuildDate>
     <item>
       <title>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</title>
       <link>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</link>
