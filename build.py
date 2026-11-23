@@ -504,9 +504,64 @@ def check_posts():
     return 0
 
 
+def check_site_links():
+    """扫 docs/ 里已生成的 HTML，校验每个站内 href/src 的文件与 #锚点 是否真实存在。
+
+    --check 只看 Markdown 源，管不到模板拼出来的链接（上一篇/下一篇、专栏目录、
+    标签锚点）。改过 slug 或专栏名之后，残留的死链只有扫成品才看得见。
+    """
+    if not OUT.exists():
+        print("还没有生成站点，先跑一次 python build.py")
+        return 1
+    files = sorted(OUT.rglob("*.html"))
+    cache, problems, checked = {}, [], 0
+
+    def resolve(base_dir, path):
+        """按浏览器的规则解析相对路径：多余的 .. 在站点根处被吃掉，不会跑到 docs/ 外面"""
+        parts = list(base_dir)
+        for seg in path.split("/"):
+            if seg in ("", "."):
+                continue
+            if seg == "..":
+                if parts:
+                    parts.pop()
+                continue
+            parts.append(seg)
+        return OUT.joinpath(*parts)
+
+    for f in files:
+        html_text = f.read_text(encoding="utf-8")
+        base = f.relative_to(OUT).parts[:-1]
+        for url in re.findall(r'(?:href|src)="([^"]+)"', html_text):
+            if "://" in url or url.startswith(("mailto:", "data:", "#", "//")):
+                continue
+            path, _, frag = url.partition("#")
+            checked += 1
+            if path.endswith("/"):
+                path += "index.html"
+            target = f if not path else resolve(base, path)
+            if not target.exists():
+                problems.append(f"{f.relative_to(OUT)}: 链接目标不存在 {url}")
+                continue
+            if frag and target.suffix == ".html":
+                if target not in cache:
+                    cache[target] = target.read_text(encoding="utf-8")
+                if f'id="{frag}"' not in cache[target]:
+                    problems.append(f"{f.relative_to(OUT)}: 锚点不存在 {url}")
+    print(f"扫描 {len(files)} 个页面 / {checked} 条站内链接")
+    if problems:
+        for x in problems:
+            print("  ✗ " + x)
+        return 1
+    print("  全部通过：站内链接与锚点都能落到真实页面")
+    return 0
+
+
 def main():
     if "--check" in sys.argv:
         return check_posts()
+    if "--check-links" in sys.argv:
+        return check_site_links()
 
     posts = load_posts()
 
