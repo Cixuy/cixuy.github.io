@@ -5,8 +5,13 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 23 Nov 2026 02:09:11 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 24 Nov 2026 02:10:12 +0800</lastBuildDate>
     <item>
+      <title>epoll 的 LT 与 ET：一次漏读怎么把连接挂死</title>
+      <link>https://cixuy.github.io/posts/epoll-lt-et-edge-trigger/index.html</link>
+      <guid>https://cixuy.github.io/posts/epoll-lt-et-edge-trigger/index.html</guid>
+      <description>水平触发和边缘触发的判定条件、ET 为什么必须配非阻塞且循环读到 EAGAIN、EPOLLOUT 什么时候该注册——以及「连接还活着但再也不回包」是怎么来的。</description>
+    </item>    <item>
       <title>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</title>
       <link>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</link>
       <guid>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</guid>
