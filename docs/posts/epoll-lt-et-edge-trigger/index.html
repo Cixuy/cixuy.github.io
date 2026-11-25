@@ -173,7 +173,7 @@ fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 <p>ET 的性能优势在于减少 <code>epoll_wait</code> 的重复返回，量级上是「少几次系统调用」；付出的代价是每条读写路径都必须写对循环。<strong>用 ET 换来的性能，往往抵不上一次漏读造成的线上故障</strong>——除非你已经把边界写成了肌肉记忆。</p>
     </div>
     <footer class="article-foot">
-      <div><a href="../../posts/go-gmp-scheduler/index.html">← Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</a></div>
+      <div><a href="../../posts/go-gmp-scheduler/index.html">← Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</a> <a href="../../posts/cpp-move-semantics-std-move/index.html">下一篇：C++ 移动语义：std::move 之后对象还剩什么 →</a></div>
       <div><a href="../../index.html">返回文章列表</a></div>
     </footer>
   </article>

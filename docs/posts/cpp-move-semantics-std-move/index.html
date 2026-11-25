@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ 移动语义：std::move 之后对象还剩什么 · Cixuy</title>
+<meta name="description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:title" content="C++ 移动语义：std::move 之后对象还剩什么 · Cixuy">
+<meta property="og:description" content="写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cixuy" href="../../feed.xml">
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../index.html">Cixuy</a>
+    <nav class="nav">
+      <a href="../../index.html">文章</a>
+      <a href="../../tags/index.html">标签</a>
+      <a href="../../series/index.html">专栏</a>
+      <a href="../../about/index.html">关于</a>
+      <a href="../../feed.xml">RSS</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换深色模式">◐</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <article class="article">
+    <header class="article-head">
+      <h1>C++ 移动语义：std::move 之后对象还剩什么</h1>
+      <div class="meta-line">
+        <span>创建 2026 年 11 月 25 日</span>
+        <span>更新 2026 年 11 月 25 日</span>
+        <span>约 3 分钟</span>
+        
+        <span class="tags"><a class="tag" href="../../tags/index.html#c">C++</a><a class="tag" href="../../tags/index.html#移动语义">移动语义</a><a class="tag" href="../../tags/index.html#右值引用">右值引用</a><a class="tag" href="../../tags/index.html#性能">性能</a></span>
+      </div>
+    </header>
+
+    <div class="prose">
+<p><code>std::move</code> 这个名字骗了很多人：它<strong>不移动任何东西</strong>，只是一个 <code>static_cast&lt;T&amp;&amp;&gt;</code>。真正发生资源转移的是移动构造函数，而是否被调用、调用后源对象变成什么样，有几条容易记错的规则。</p>
+<h2>std::move 只是把左值转成右值</h2>
+<p>标准库里的实现大概长这样：</p>
+<pre><code class="language-cpp">template &lt;typename T&gt;
+constexpr std::remove_reference_t&lt;T&gt;&amp;&amp; move(T&amp;&amp; t) noexcept {
+    return static_cast&lt;std::remove_reference_t&lt;T&gt;&amp;&amp;&gt;(t);
+}
+</code></pre>
+<p>它做的事只有一件：<strong>把表达式强制转成右值引用</strong>，从而让重载决议选中移动构造函数（或移动赋值）。没有内存拷贝，没有资源转移。</p>
+<p>所以下面这段代码什么都没有发生：</p>
+<pre><code class="language-cpp">std::string s = &quot;hello&quot;;
+std::move(s);            // 只是构造了一个右值引用，然后丢弃
+std::cout &lt;&lt; s;          // 还是 hello
+</code></pre>
+<p>真正触发移动的是「用这个右值去构造/赋值」：</p>
+<pre><code class="language-cpp">std::string t = std::move(s);   // 这里才调用移动构造，s 的内容被搬走
+</code></pre>
+<h2>moved-from 对象是什么状态</h2>
+<p>标准规定：<strong>valid but unspecified</strong>（有效但未指定）。翻译成人话：</p>
+<ul>
+<li>✅ 可以析构</li>
+<li>✅ 可以重新赋值</li>
+<li>✅ 可以调用不依赖具体值的成员（比如 <code>empty()</code> 是否合法取决于类型，<code>clear()</code> 安全）</li>
+<li>❌ 不要读取它的值，也不要把「它一定是空」当成契约</li>
+</ul>
+<p>标准库容器和 <code>std::string</code> 在实践中通常被搬空，但这是实现行为，不是语言保证：</p>
+<pre><code class="language-cpp">std::string a = &quot;abcdefghijklmnopqrstuvwxyz&quot;;  // 超过 SSO 阈值（通常 15）
+std::string b = std::move(a);
+// a 现在通常是空串，但标准只保证「有效」
+a = &quot;reuse&quot;;      // 合法，重新赋值
+</code></pre>
+<p><strong>短字符串要特别注意</strong>：如果字符串长度在 SSO（小字符串优化）范围内，数据存在对象内部的缓冲区里，移动时需要真的拷贝这些字节（因为是就地存储），源对象往往被置空但不是「指针搬走」。</p>
+<h2>返回局部变量：不要写 std::move</h2>
+<p>这是最经典的反模式：</p>
+<pre><code class="language-cpp">std::vector&lt;int&gt; make() {
+    std::vector&lt;int&gt; v = {1, 2, 3};
+    return std::move(v);   // ❌ 反而更慢
+}
+</code></pre>
+<p>原因：编译器对「返回局部变量」有 <strong>NRVO</strong>（具名返回值优化），直接把 <code>v</code> 构造在调用方的位置上，零拷贝零移动。而一旦你写成 <code>std::move(v)</code>，返回值变成一个右值表达式，<strong>NRVO 不再适用</strong>，退化成一次移动构造。</p>
+<p>正确写法就是 <code>return v;</code>。C++17 起，返回纯右值（prvalue）时的拷贝消除是<strong>强制的</strong>，连移动都不会发生：</p>
+<pre><code class="language-cpp">std::vector&lt;int&gt; make() {
+    return {1, 2, 3};   // C++17 保证不产生临时对象
+}
+</code></pre>
+<p>想验证可以在编译时加 <code>-fno-elide-constructors</code> 关掉优化，对比调用了几次构造/析构。</p>
+<h2>std::forward 和 std::move 的区别</h2>
+<p><code>std::move</code> 无条件转成右值；<code>std::forward</code> <strong>按原样转发</strong>（左值还是左值，右值还是右值）。模板转发必须用后者：</p>
+<pre><code class="language-cpp">template &lt;typename T&gt;
+void wrapper(T&amp;&amp; arg) {          // 万能引用，不是右值引用
+    inner(std::forward&lt;T&gt;(arg)); // ✅ 保持值类别
+    // inner(std::move(arg));    // ❌ 即使传进来的是左值也会被当右值搬走
+}
+</code></pre>
+<p>判断标准：</p>
+<ul>
+<li><strong>确定要把资源交出去</strong> → <code>std::move</code></li>
+<li><strong>只是把参数原样传给下一层</strong> → <code>std::forward</code></li>
+</ul>
+<p>在模板里对万能引用用 <code>std::move</code>，会把调用方的左值悄悄搬空，这类 bug 极难排查——调用方传了个变量进来，函数返回后变量空了。</p>
+<h2>移动构造要标 noexcept</h2>
+<p>标准库容器在扩容时有一个选择：元素能否安全移动。判断依据是 <code>std::is_nothrow_move_constructible</code>：</p>
+<pre><code class="language-cpp">struct Widget {
+    Widget(Widget&amp;&amp;) noexcept;              // ✅ vector 扩容时用移动
+    Widget(const Widget&amp;);                  // 拷贝构造
+};
+</code></pre>
+<p>如果移动构造没有 <code>noexcept</code>，<code>vector</code> 在扩容时<strong>会退化成拷贝</strong>——因为移动过程中抛异常会导致容器处于不一致状态，标准库不敢用。这是「我明明写了移动构造，性能却没提升」的常见原因。</p>
+<p><code>std::string</code>、<code>std::vector</code> 这些标准类型的移动构造都是 <code>noexcept</code> 的，所以放进容器没问题；自己写的类型要记得标。</p>
+<h2>小结</h2>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>std::move(x)</code></td>
+<td>只是转成右值引用，不移动任何东西</td>
+</tr>
+<tr>
+<td><code>T y = std::move(x)</code></td>
+<td>调用移动构造，<code>x</code> 进入 valid-but-unspecified</td>
+</tr>
+<tr>
+<td><code>return std::move(local)</code></td>
+<td>❌ 阻止 NRVO，反而多一次移动</td>
+</tr>
+<tr>
+<td><code>return local;</code></td>
+<td>✅ NRVO；C++17 对纯右值强制消除</td>
+</tr>
+<tr>
+<td>模板转发用 <code>std::move</code></td>
+<td>❌ 会搬空调用方的左值，应该用 <code>std::forward</code></td>
+</tr>
+<tr>
+<td>移动构造不标 <code>noexcept</code></td>
+<td>❌ 容器扩容时退化为拷贝</td>
+</tr>
+</tbody>
+</table>
+<p>一句话记：<strong><code>std::move</code> 是「我允许你搬」，不是「我搬了」</strong>；而要不要搬、怎么搬，取决于被调用的那个移动构造函数。</p>
+    </div>
+    <footer class="article-foot">
+      <div><a href="../../posts/epoll-lt-et-edge-trigger/index.html">← epoll 的 LT 与 ET：一次漏读怎么把连接挂死</a></div>
+      <div><a href="../../index.html">返回文章列表</a></div>
+    </footer>
+  </article>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Cixuy</span>
+    <span><a href="../../feed.xml">RSS</a> · 用 Markdown 写作，一条命令生成</span>
+  </div>
+</footer>
+<script src="../../assets/app.js"></script>
+</body>
+</html>
