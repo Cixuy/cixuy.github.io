@@ -5,121 +5,144 @@
     <link>https://cixuy.github.io/</link>
     <description>写那些藏在底下的东西。Java 后端、缓存与并发、存储选型，以及 AI 应用落地。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 26 Nov 2026 02:16:02 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 26 Nov 2026 21:37:51 +0800</lastBuildDate>
     <item>
       <title>C++ 移动语义：std::move 之后对象还剩什么</title>
       <link>https://cixuy.github.io/posts/cpp-move-semantics-std-move/index.html</link>
       <guid>https://cixuy.github.io/posts/cpp-move-semantics-std-move/index.html</guid>
+      <pubDate>Wed, 25 Nov 2026 00:00:00 +0800</pubDate>
       <description>std::move 只是类型转换、moved-from 对象的真实状态、RVO 何时绕过移动、为什么返回局部变量不用 std::move——四个最常被写错的点。</description>
     </item>    <item>
       <title>epoll 的 LT 与 ET：一次漏读怎么把连接挂死</title>
       <link>https://cixuy.github.io/posts/epoll-lt-et-edge-trigger/index.html</link>
       <guid>https://cixuy.github.io/posts/epoll-lt-et-edge-trigger/index.html</guid>
+      <pubDate>Tue, 24 Nov 2026 00:00:00 +0800</pubDate>
       <description>水平触发和边缘触发的判定条件、ET 为什么必须配非阻塞且循环读到 EAGAIN、EPOLLOUT 什么时候该注册——以及「连接还活着但再也不回包」是怎么来的。</description>
     </item>    <item>
       <title>Go 的 GMP 调度：goroutine 阻塞时 P 去哪了</title>
       <link>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</link>
       <guid>https://cixuy.github.io/posts/go-gmp-scheduler/index.html</guid>
+      <pubDate>Mon, 23 Nov 2026 00:00:00 +0800</pubDate>
       <description>G、M、P 三者的关系，本地队列与 work stealing，系统调用时 P 的 handoff，以及 netpoller 怎么让网络 IO 不占线程——把「开十万个 goroutine 为什么不炸」讲清楚。</description>
     </item>    <item>
       <title>Redis 单线程模型：一条 GET 命令从 epoll 到回复的完整路径</title>
       <link>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</link>
       <guid>https://cixuy.github.io/posts/redis-single-thread-command-path/index.html</guid>
+      <pubDate>Sun, 22 Nov 2026 00:00:00 +0800</pubDate>
       <description>单线程为什么还能这么快、6.0 的 IO 多线程到底分担了什么、哪些命令会把整个实例卡住——按一条 GET 的执行顺序走一遍。</description>
     </item>    <item>
       <title>Spring Boot 自动配置：@Conditional 在启动时怎么决定装哪些 Bean</title>
       <link>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</link>
       <guid>https://cixuy.github.io/posts/spring-boot-autoconfiguration-conditions/index.html</guid>
+      <pubDate>Sat, 21 Nov 2026 00:00:00 +0800</pubDate>
       <description>从 @SpringBootApplication 的三件套，到 AutoConfiguration.imports 的加载顺序，再到 @ConditionalOnMissingBean 为什么有时不生效——把自动配置的装配过程拆开看。</description>
     </item>    <item>
       <title>InnoDB 的 MVCC：可重复读下的一条 SELECT 是怎么拿到快照的</title>
       <link>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</link>
       <guid>https://cixuy.github.io/posts/innodb-mvcc-read-view/index.html</guid>
+      <pubDate>Fri, 20 Nov 2026 00:00:00 +0800</pubDate>
       <description>从隐藏列、undo 版本链到 Read View 的四个字段，把「为什么我读到的是旧数据」「为什么另一个事务提交了我还看不见」讲成一条可以走通的路径。</description>
     </item>    <item>
       <title>Redis 整体不可用时的降级与限流：一次故障演练复盘</title>
       <link>https://cixuy.github.io/posts/redis-outage-fallback/index.html</link>
       <guid>https://cixuy.github.io/posts/redis-outage-fallback/index.html</guid>
+      <pubDate>Thu, 19 Nov 2026 00:00:00 +0800</pubDate>
       <description>缓存扛住的流量，在缓存挂掉的那一刻全部压到数据库上。不做降级和限流，Redis 重启的那两分钟就是整个系统下线的时间。</description>
     </item>    <item>
       <title>RAG 召回效果差？切片粒度、重叠与 Embedding 模型的选择</title>
       <link>https://cixuy.github.io/posts/rag-chunking-tuning/index.html</link>
       <guid>https://cixuy.github.io/posts/rag-chunking-tuning/index.html</guid>
+      <pubDate>Wed, 18 Nov 2026 00:00:00 +0800</pubDate>
       <description>知识库明明有答案，检索就是召不回来。切片太大语义被稀释、没有重叠导致答案被切断、通用模型对中文技术文档不敏感——三个变量我都踩过一遍。</description>
     </item>    <item>
       <title>JWT 无状态认证的登出方案对比：黑名单、短令牌与双 Token</title>
       <link>https://cixuy.github.io/posts/jwt-logout-strategies/index.html</link>
       <guid>https://cixuy.github.io/posts/jwt-logout-strategies/index.html</guid>
+      <pubDate>Tue, 17 Nov 2026 00:00:00 +0800</pubDate>
       <description>JWT 最大的卖点是&quot;服务端不存状态&quot;，所以&quot;登出&quot;这件事天生就别扭。四种方案的实现方式、代价和适用场景，以及我最后为什么选了双 Token。</description>
     </item>    <item>
       <title>从 MCP 到 A2A：多 Agent 协作到底难在哪</title>
       <link>https://cixuy.github.io/posts/a2a-multi-agent-collaboration/index.html</link>
       <guid>https://cixuy.github.io/posts/a2a-multi-agent-collaboration/index.html</guid>
+      <pubDate>Mon, 16 Nov 2026 00:00:00 +0800</pubDate>
       <description>MCP 让模型会用工具，A2A 让 Agent 之间能互相调用。真正写一遍才发现，协议只是入场券，配额、幂等、超时、审计才是要命的地方。</description>
     </item>    <item>
       <title>改了 Prompt 之后到底变好还是变差：攒一套能重复跑的用例</title>
       <link>https://cixuy.github.io/posts/agent-eval-loop/index.html</link>
       <guid>https://cixuy.github.io/posts/agent-eval-loop/index.html</guid>
+      <pubDate>Mon, 16 Nov 2026 00:00:00 +0800</pubDate>
       <description>调切片大小、改合并策略、加一条记忆规则，每次改完都觉得&quot;看起来更好了&quot;。这一章写我怎么用一套固定用例把这种错觉压下去，以及评测集到底该长什么样。</description>
     </item>    <item>
       <title>Reactor 里 return 和 break 差之毫厘：客户端收不到任何响应</title>
       <link>https://cixuy.github.io/posts/cpp-reactor-return-vs-break/index.html</link>
       <guid>https://cixuy.github.io/posts/cpp-reactor-return-vs-break/index.html</guid>
+      <pubDate>Mon, 16 Nov 2026 00:00:00 +0800</pubDate>
       <description>健康检查接口不报错、不超时、也不返回数据，就是没反应。根因是一个循环里的 return 跳过了后面的发送逻辑。</description>
     </item>    <item>
       <title>自己写网关踩的两个坑：限流没生效，熔断不触发</title>
       <link>https://cixuy.github.io/posts/gateway-limiter-breaker-pitfalls/index.html</link>
       <guid>https://cixuy.github.io/posts/gateway-limiter-breaker-pitfalls/index.html</guid>
+      <pubDate>Mon, 16 Nov 2026 00:00:00 +0800</pubDate>
       <description>压测 200 次一个 429 都没有，后端挂掉后 8 次请求照样 502。两个问题都不是代码写错，而是漏了一层结构性的东西。</description>
     </item>    <item>
       <title>MySQL 分表后的分页与聚合：跨表查询的三种处理方式</title>
       <link>https://cixuy.github.io/posts/mysql-sharding-pagination/index.html</link>
       <guid>https://cixuy.github.io/posts/mysql-sharding-pagination/index.html</guid>
+      <pubDate>Mon, 16 Nov 2026 00:00:00 +0800</pubDate>
       <description>操作日志按时间分表之后，后台列表页直接崩了。分页、总数统计、跨表排序，这三个问题各有各的解法，代价也不一样。</description>
     </item>    <item>
       <title>ThreadLocal 用完没清理导致用户信息串号，问题出在线程池复用</title>
       <link>https://cixuy.github.io/posts/threadlocal-context-leak/index.html</link>
       <guid>https://cixuy.github.io/posts/threadlocal-context-leak/index.html</guid>
+      <pubDate>Sun, 15 Nov 2026 00:00:00 +0800</pubDate>
       <description>两个账号同时操作，一个看到了另一个的数据。本地怎么都复现不了，根因是 Tomcat 线程池复用线程时上一次的 ThreadLocal 没被清掉。</description>
     </item>    <item>
       <title>工具挂了 Agent 就崩？降级、超时和两个引擎打架怎么收场</title>
       <link>https://cixuy.github.io/posts/agent-tool-degradation/index.html</link>
       <guid>https://cixuy.github.io/posts/agent-tool-degradation/index.html</guid>
+      <pubDate>Sat, 14 Nov 2026 00:00:00 +0800</pubDate>
       <description>评审 Agent 背后有两个引擎：C++ 静态分析服务和 Java 规则引擎。它们会超时、会给出重复结论、会互相矛盾。这一章写合并规则和三层降级，以及为什么错误信息也要写成给模型看的样子。</description>
     </item>    <item>
       <title>WebSocket 部署到 Nginx 后连接断开？三个原因与完整配置</title>
       <link>https://cixuy.github.io/posts/websocket-behind-nginx/index.html</link>
       <guid>https://cixuy.github.io/posts/websocket-behind-nginx/index.html</guid>
+      <pubDate>Sat, 14 Nov 2026 00:00:00 +0800</pubDate>
       <description>本地正常、上线就失败的典型场景：握手 400、连上 60 秒断、https 下直接连不上。逐条给出原因、配置和排查顺序。</description>
     </item>    <item>
       <title>让 Agent 记住这个项目：记忆分三层，别混成一层</title>
       <link>https://cixuy.github.io/posts/agent-memory-layers/index.html</link>
       <guid>https://cixuy.github.io/posts/agent-memory-layers/index.html</guid>
+      <pubDate>Thu, 12 Nov 2026 00:00:00 +0800</pubDate>
       <description>会话记忆、项目记忆、检索出来的证据，这三样东西混在一起是灾难。这一章写我怎么把&quot;记住&quot;拆开存、怎么决定什么时候写回去，以及过期规则怎么清。</description>
     </item>    <item>
       <title>缓存击穿实战：逻辑过期 + Redisson 分布式锁，以及我踩的四个坑</title>
       <link>https://cixuy.github.io/posts/redis-logical-expire/index.html</link>
       <guid>https://cixuy.github.io/posts/redis-logical-expire/index.html</guid>
+      <pubDate>Thu, 12 Nov 2026 00:00:00 +0800</pubDate>
       <description>两种方案对比、逻辑过期的实现方式，以及重建互斥、锁续期、线程池隔离、失败退避这四个必须处理的细节。</description>
     </item>    <item>
       <title>MySQL 还是 InfluxDB：监控系统海量指标数据的存储选型与实践</title>
       <link>https://cixuy.github.io/posts/influxdb-vs-mysql-for-metrics/index.html</link>
       <guid>https://cixuy.github.io/posts/influxdb-vs-mysql-for-metrics/index.html</guid>
+      <pubDate>Mon, 09 Nov 2026 00:00:00 +0800</pubDate>
       <description>从单表膨胀的算账过程讲起，对比两种存储的适用边界，再记录 tag/field 设计、窗口聚合、数据过期这三处实际踩过的坑。</description>
     </item>    <item>
       <title>上下文窗口不是无限口袋：8000 字符预算怎么切</title>
       <link>https://cixuy.github.io/posts/agent-context-budget/index.html</link>
       <guid>https://cixuy.github.io/posts/agent-context-budget/index.html</guid>
+      <pubDate>Sun, 08 Nov 2026 00:00:00 +0800</pubDate>
       <description>一个代码文件几千行，全塞进去模型就开始丢指令；塞太少又看不出跨文件关系。这一章写我怎么定 800 / 8000 这两个数，以及预算超了之后先砍谁。</description>
     </item>    <item>
       <title>接 MCP 协议时踩的坑：Java SDK 和 Jackson 版本打架</title>
       <link>https://cixuy.github.io/posts/mcp-java-sdk-jackson-conflict/index.html</link>
       <guid>https://cixuy.github.io/posts/mcp-java-sdk-jackson-conflict/index.html</guid>
+      <pubDate>Fri, 06 Nov 2026 00:00:00 +0800</pubDate>
       <description>编译通过、打包成功、启动一切正常，第一个 MCP 请求进来就 500。NoSuchFieldError: POJO 的完整排查过程，以及这个 SDK 的 JSON 层为什么是插件化的。</description>
     </item>    <item>
       <title>先别急着上框架：一次工具调用循环到底长什么样</title>
       <link>https://cixuy.github.io/posts/agent-tool-loop/index.html</link>
       <guid>https://cixuy.github.io/posts/agent-tool-loop/index.html</guid>
+      <pubDate>Wed, 04 Nov 2026 00:00:00 +0800</pubDate>
       <description>把 Agent 拆开看，它只是一段 while 循环：问模型、执行它点名的工具、把结果塞回去、再问。这一章写清楚这个循环的最小实现，以及我第一版漏掉的四个细节。</description>
     </item>
   </channel>

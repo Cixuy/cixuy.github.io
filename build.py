@@ -75,6 +75,28 @@ def fmt_date(s):
             return s
 
 
+# RSS 的日期必须是不依赖语言的 RFC 822 英文格式。以前直接用 strftime("%a, %d %b %Y")，
+# 在中文 locale 下 %a/%b 会输出「周一 / 十一月」，feed 里那一行就成了非法 pubDate，
+# 阅读器会整条丢掉时间甚至不显示条目。这里用固定词表，跟系统语言无关。
+_WDAY = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_MON = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def rfc822(y, mo, d, hh=0, mi=0, ss=0):
+    wd = _WDAY[datetime.date(y, mo, d).weekday()]
+    return f"{wd}, {d:02d} {_MON[mo - 1]} {y} {hh:02d}:{mi:02d}:{ss:02d} +0800"
+
+
+def rfc822_of(date_str):
+    """front-matter 的 date 转 RFC 822；解析不了返回空串（宁可少一个字段也别写个坏日期）"""
+    try:
+        d = datetime.date.fromisoformat(str(date_str).strip())
+    except Exception:
+        return ""
+    return rfc822(d.year, d.month, d.day)
+
+
 def slugify_tag(t):
     return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", t.lower()).strip("-") or "tag"
 
@@ -414,13 +436,17 @@ def build_page(md_file):
 
 
 def build_feed(posts):
-    now = datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0800")
+    now_dt = datetime.datetime.now()
+    now = rfc822(now_dt.year, now_dt.month, now_dt.day,
+                 now_dt.hour, now_dt.minute, now_dt.second)
     items = []
     for p in posts:
+        pub = rfc822_of(p.get("date", ""))
+        pub_tag = f"\n      <pubDate>{pub}</pubDate>" if pub else ""
         items.append(f"""    <item>
       <title>{esc(p['title'])}</title>
       <link>{SITE['url']}/{post_url(p)}</link>
-      <guid>{SITE['url']}/{post_url(p)}</guid>
+      <guid>{SITE['url']}/{post_url(p)}</guid>{pub_tag}
       <description>{esc(p['summary'])}</description>
     </item>""")
     return f"""<?xml version="1.0" encoding="UTF-8"?>
