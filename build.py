@@ -583,11 +583,40 @@ def check_site_links():
     return 0
 
 
+def check_pending():
+    """今天有没有「到期但还没生成」的文章：只读，不写 docs/。
+
+    定时任务的前置判断用。没有它的话，每天跑一遍 build.py 都会重写 feed.xml 的
+    lastBuildDate，即使一篇文章都没到期也会产生一条只改一行的空提交。
+    退出码 0 = 有待发布（该构建），1 = 没有（该跳过）。
+    """
+    today = datetime.date.today().isoformat()
+    pending = []
+    for f in sorted(POSTS_DIR.glob("*.md")):
+        meta, _ = parse_front_matter(f.read_text(encoding="utf-8"))
+        if not meta or meta.get("draft", "").lower() in ("true", "yes", "1"):
+            continue
+        date = meta.get("date", "")
+        if date != today:          # 只看今天到期的，未到期的不算
+            continue
+        if not (OUT / "posts" / f.stem / "index.html").exists():
+            pending.append(meta.get("title", f.stem))
+
+    if pending:
+        for t in pending:
+            print("待发布：" + t)
+        return 0
+    print("今天（%s）没有到期未发布的文章" % today)
+    return 1
+
+
 def main():
     if "--check" in sys.argv:
         return check_posts()
     if "--check-links" in sys.argv:
         return check_site_links()
+    if "--pending" in sys.argv:
+        return check_pending()
 
     posts = load_posts()
 
